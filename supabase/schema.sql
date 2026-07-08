@@ -76,6 +76,13 @@ create table if not exists prospection_config (
   updated_at timestamptz not null default now()
 );
 
+-- Rate limit do login do dashboard (protecao contra forca bruta).
+create table if not exists login_attempts (
+  ip text primary key,
+  failed_count int not null default 0,
+  locked_until timestamptz
+);
+
 create index if not exists idx_site_analysis_lead_id on site_analysis(lead_id);
 create index if not exists idx_outreach_lead_id on outreach(lead_id);
 create index if not exists idx_outreach_status on outreach(status);

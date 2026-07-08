@@ -1,4 +1,5 @@
 import { getUsageStats } from "@/lib/usage";
+import { getWeeklyTrends } from "@/lib/trends";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +15,64 @@ function Bar({ used, total }: { used: number; total: number }) {
   );
 }
 
+function TrendChart({ trends }: { trends: Awaited<ReturnType<typeof getWeeklyTrends>> }) {
+  const maxLeads = Math.max(1, ...trends.map((t) => t.leadsFound));
+
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+      <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        Tendência (últimas {trends.length} semanas)
+      </span>
+
+      <div className="mt-4 flex items-end gap-2" style={{ height: "120px" }}>
+        {trends.map((t) => (
+          <div key={t.weekStart} className="flex flex-1 flex-col items-center gap-1">
+            <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
+              {t.leadsFound}
+            </span>
+            <div
+              className="w-full rounded-t bg-emerald-400 dark:bg-emerald-600"
+              style={{
+                height: `${Math.max(2, (t.leadsFound / maxLeads) * 90)}px`,
+              }}
+            />
+            <span className="text-[9px] text-zinc-400 dark:text-zinc-500">
+              {t.weekLabel}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Leads encontrados por semana</p>
+
+      <div className="mt-6 space-y-2">
+        {trends.map((t) => (
+          <div key={t.weekStart} className="flex items-center gap-2 text-xs">
+            <span className="w-16 text-zinc-500 dark:text-zinc-400">{t.weekLabel}</span>
+            <div className="h-2 flex-1 rounded-full bg-zinc-200 dark:bg-zinc-800">
+              <div
+                className="h-2 rounded-full bg-purple-500"
+                style={{ width: `${t.responseRate ?? 0}%` }}
+              />
+            </div>
+            <span className="w-24 text-right text-zinc-500 dark:text-zinc-400">
+              {t.responseRate !== null
+                ? `${t.responseRate}% (${t.respondedCount}/${t.contactedCount})`
+                : "sem envios"}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+        Taxa de resposta por semana (de quem foi contatado naquela semana, quantos já
+        responderam ou avançaram no pipeline até hoje)
+      </p>
+    </div>
+  );
+}
+
 export default async function UsagePage() {
   const stats = await getUsageStats();
+  const trends = await getWeeklyTrends(8);
 
   return (
     <div className="min-h-screen bg-zinc-50 p-8 font-sans dark:bg-black">
@@ -29,6 +86,8 @@ export default async function UsagePage() {
         </h1>
 
         <div className="mt-6 space-y-6">
+          <TrendChart trends={trends} />
+
           <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
             <div className="flex items-baseline justify-between">
               <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">

@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { searchLeads } from "./google-maps";
-import { deduplicateLeads } from "./deduplication";
+import { deduplicateLeads, normalizePhone } from "./deduplication";
 import { analyzeSite } from "./site-analysis";
 import { findEmailForWebsite } from "./hunter";
 import { scrapeEmailFromWebsite } from "./email-scraper";
@@ -20,12 +20,26 @@ export async function scrapeLeadsForQuery(category: string, location: string) {
     )
   );
 
-  const newLeads = deduped.filter(
-    (l) =>
-      !existingKeys.has(
-        `${l.name.trim().toLowerCase()}|${(l.address ?? "").trim().toLowerCase()}`
-      )
+  // Telefone é checado contra TODAS as categorias (não só a atual), pra
+  // evitar contatar o mesmo negócio duas vezes se ele aparecer em buscas
+  // de nichos diferentes (ex: escritório que é ao mesmo tempo "advogados"
+  // e "escritórios de contabilidade").
+  const { data: existingPhones } = await supabase.from("leads").select("phone");
+  const existingPhoneSet = new Set(
+    (existingPhones ?? [])
+      .map((l) => normalizePhone(l.phone))
+      .filter((p): p is string => p !== null)
   );
+
+  const newLeads = deduped.filter((l) => {
+    const key = `${l.name.trim().toLowerCase()}|${(l.address ?? "").trim().toLowerCase()}`;
+    if (existingKeys.has(key)) return false;
+
+    const phone = normalizePhone(l.phone);
+    if (phone && existingPhoneSet.has(phone)) return false;
+
+    return true;
+  });
 
   if (newLeads.length > 0) {
     const { error } = await supabase.from("leads").insert(newLeads);
