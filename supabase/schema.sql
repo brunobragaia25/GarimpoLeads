@@ -83,6 +83,16 @@ create table if not exists login_attempts (
   locked_until timestamptz
 );
 
+-- Expoe o tamanho do banco pro painel /usage (a API de management do
+-- Supabase nao expoe isso de forma self-service com token de acesso).
+create or replace function get_database_size()
+returns bigint
+language sql
+security definer
+as $$
+  select pg_database_size(current_database());
+$$;
+
 create index if not exists idx_site_analysis_lead_id on site_analysis(lead_id);
 create index if not exists idx_outreach_lead_id on outreach(lead_id);
 create index if not exists idx_outreach_status on outreach(status);

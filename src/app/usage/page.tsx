@@ -6,6 +6,12 @@ import { Gauge, TrendingUp, Mail, Users, MailCheck } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 const HUNTER_MONTHLY_QUOTA = 50;
+const SUPABASE_FREE_TIER_BYTES = 500 * 1024 * 1024; // 500MB
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function Bar({ used, total }: { used: number; total: number }) {
   const pct = Math.min(100, Math.round((used / total) * 100));
@@ -23,19 +29,21 @@ function QuotaCard({
   total,
   suffix,
   note,
+  displayUsed,
 }: {
   title: string;
   used: number;
   total: number;
   suffix: string;
   note: string;
+  displayUsed?: string;
 }) {
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex items-baseline justify-between">
         <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{title}</span>
         <span className="text-sm text-zinc-500 dark:text-zinc-400">
-          {used} / {suffix}
+          {displayUsed ?? used} / {suffix}
         </span>
       </div>
       <Bar used={used} total={total} />
@@ -179,6 +187,17 @@ export default async function UsagePage() {
               Free tier do Resend: 3.000/mês, 100/dia.
             </p>
           </div>
+
+          {stats.databaseSizeBytes !== null && (
+            <QuotaCard
+              title="Banco de dados (Supabase)"
+              used={stats.databaseSizeBytes}
+              total={SUPABASE_FREE_TIER_BYTES}
+              suffix="500 MB"
+              displayUsed={formatBytes(stats.databaseSizeBytes)}
+              note="Free tier do Supabase: 500MB de banco de dados."
+            />
+          )}
         </div>
       </main>
     </div>

@@ -20,6 +20,7 @@ export interface UsageStats {
   dailyLimit: number;
   totalLeads: number;
   totalWithEmail: number;
+  databaseSizeBytes: number | null;
 }
 
 export async function getUsageStats(): Promise<UsageStats> {
@@ -61,6 +62,8 @@ export async function getUsageStats(): Promise<UsageStats> {
     .select("*", { count: "exact", head: true })
     .not("email", "is", null);
 
+  const { data: dbSize } = await supabase.rpc("get_database_size");
+
   return {
     hunterCallsThisMonth: hunterCalls ?? 0,
     emailsSentThisMonth: (contactedThisMonth ?? 0) + (followUpsThisMonth ?? 0),
@@ -68,5 +71,6 @@ export async function getUsageStats(): Promise<UsageStats> {
     dailyLimit: Number(process.env.SEND_DAILY_LIMIT) || 30,
     totalLeads: totalLeads ?? 0,
     totalWithEmail: totalWithEmail ?? 0,
+    databaseSizeBytes: dbSize ?? null,
   };
 }
