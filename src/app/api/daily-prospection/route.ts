@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   let emailsFound = 0;
   let followUpsSent = 0;
 
-  const pairs = getPairsForDay(new Date(), PAIRS_PER_DAY);
+  const pairs = await getPairsForDay(new Date(), PAIRS_PER_DAY);
 
   for (const { category, location } of pairs) {
     try {

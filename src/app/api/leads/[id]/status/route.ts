@@ -7,7 +7,18 @@ async function isAuthorized(req: NextRequest): Promise<boolean> {
   return isValidSessionCookie(session);
 }
 
-const ALLOWED_STATUSES = ["pending", "ignored", "contacted", "unsubscribed", "responded"];
+const ALLOWED_STATUSES = [
+  "pending",
+  "contacted",
+  "responded",
+  "meeting_scheduled",
+  "proposal_sent",
+  "closed_won",
+  "closed_lost",
+  "ignored",
+  "unsubscribed",
+  "bounced",
+];
 
 export async function POST(
   req: NextRequest,

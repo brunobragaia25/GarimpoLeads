@@ -38,6 +38,8 @@ create table if not exists outreach (
   status text not null default 'pending', -- pending | contacted | responded | ignored | unsubscribed | bounced
   contacted_at timestamptz,
   follow_up_sent_at timestamptz,
+  opened_at timestamptz,
+  clicked_at timestamptz,
   notes text,
   created_at timestamptz not null default now()
 );
@@ -64,6 +66,15 @@ create table if not exists message_templates (
 
 create unique index if not exists idx_message_templates_category
   on message_templates ((coalesce(category, '')));
+
+-- Categorias e cidades usadas pelo cron diário (editável pelo dashboard).
+-- Sempre 1 linha só; se vazia, o código usa os defaults embutidos.
+create table if not exists prospection_config (
+  id uuid primary key default uuid_generate_v4(),
+  categories text[] not null default '{}',
+  cities text[] not null default '{}',
+  updated_at timestamptz not null default now()
+);
 
 create index if not exists idx_site_analysis_lead_id on site_analysis(lead_id);
 create index if not exists idx_outreach_lead_id on outreach(lead_id);

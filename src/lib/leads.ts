@@ -19,6 +19,8 @@ export interface LeadWithDetails {
   outreach_status: string | null;
   contacted_at: string | null;
   follow_up_sent_at: string | null;
+  opened_at: string | null;
+  clicked_at: string | null;
 }
 
 // Teto de segurança pra não puxar uma tabela ilimitada de uma vez; o cron
@@ -57,6 +59,8 @@ export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
       outreach_status: outreach?.status ?? null,
       contacted_at: outreach?.contacted_at ?? null,
       follow_up_sent_at: outreach?.follow_up_sent_at ?? null,
+      opened_at: outreach?.opened_at ?? null,
+      clicked_at: outreach?.clicked_at ?? null,
     };
   });
 }
@@ -92,16 +96,15 @@ export type EmailFilter =
   | "ignored"
   | "unsubscribed"
   | "bounced"
-  | "responded";
+  | "responded"
+  | "meeting_scheduled"
+  | "proposal_sent"
+  | "closed_won"
+  | "closed_lost";
 
 export function matchesEmailFilter(lead: LeadWithDetails, filter: EmailFilter): boolean {
   if (filter === "all") return true;
   if (filter === "no_email") return !lead.email;
   if (filter === "pending") return !!lead.email && lead.outreach_status === "pending";
-  if (filter === "contacted") return lead.outreach_status === "contacted";
-  if (filter === "ignored") return lead.outreach_status === "ignored";
-  if (filter === "unsubscribed") return lead.outreach_status === "unsubscribed";
-  if (filter === "bounced") return lead.outreach_status === "bounced";
-  if (filter === "responded") return lead.outreach_status === "responded";
-  return true;
+  return lead.outreach_status === filter;
 }

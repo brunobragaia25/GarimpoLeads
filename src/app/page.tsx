@@ -6,7 +6,55 @@ import {
   type EmailFilter,
 } from "@/lib/leads";
 import { SendOutreachButton } from "./SendOutreachButton";
-import { IgnoreButton, RespondedButton } from "./LeadActions";
+import { IgnoreButton, PipelineStageSelect } from "./LeadActions";
+
+const PIPELINE_STATUSES = [
+  "contacted",
+  "responded",
+  "meeting_scheduled",
+  "proposal_sent",
+  "closed_won",
+  "closed_lost",
+];
+
+const STATUS_BADGES: Record<string, { label: string; className: string }> = {
+  contacted: {
+    label: "✓ Enviado",
+    className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
+  },
+  responded: {
+    label: "💬 Respondeu",
+    className: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400",
+  },
+  meeting_scheduled: {
+    label: "📅 Reunião marcada",
+    className: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400",
+  },
+  proposal_sent: {
+    label: "📄 Proposta enviada",
+    className: "bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-400",
+  },
+  closed_won: {
+    label: "🎉 Fechado (ganho)",
+    className: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400",
+  },
+  closed_lost: {
+    label: "Fechado (perdido)",
+    className: "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
+  },
+  ignored: {
+    label: "Ignorado",
+    className: "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
+  },
+  unsubscribed: {
+    label: "Descadastrado",
+    className: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400",
+  },
+  bounced: {
+    label: "Email inválido",
+    className: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400",
+  },
+};
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +164,18 @@ export default async function Home({
             >
               editar template de mensagem
             </a>
+            <a
+              href="/usage"
+              className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+            >
+              uso e cotas
+            </a>
+            <a
+              href="/settings"
+              className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+            >
+              configurações
+            </a>
           </div>
         </div>
         <div className="mt-2 flex flex-wrap gap-6 text-sm text-zinc-600 dark:text-zinc-400">
@@ -170,6 +230,10 @@ export default async function Home({
               <option value="unsubscribed">Descadastrado</option>
               <option value="bounced">Email inválido (bounce)</option>
               <option value="responded">Respondeu</option>
+              <option value="meeting_scheduled">Reunião marcada</option>
+              <option value="proposal_sent">Proposta enviada</option>
+              <option value="closed_won">Fechado (ganho)</option>
+              <option value="closed_lost">Fechado (perdido)</option>
             </select>
           </div>
 
@@ -323,46 +387,48 @@ export default async function Home({
                     {lead.email ?? "-"}
                   </td>
                   <td className="px-4 py-3">
-                    {lead.outreach_status === "contacted" ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
-                          ✓ Enviado {formatDate(lead.contacted_at)}
+                    <div className="flex flex-col gap-1">
+                      {lead.outreach_status && STATUS_BADGES[lead.outreach_status] ? (
+                        <span
+                          className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGES[lead.outreach_status].className}`}
+                        >
+                          {STATUS_BADGES[lead.outreach_status].label}
+                          {lead.outreach_status === "contacted" &&
+                            ` ${formatDate(lead.contacted_at)}`}
                         </span>
-                        {lead.follow_up_sent_at && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-400">
-                            ↻ Follow-up {formatDate(lead.follow_up_sent_at)}
-                          </span>
-                        )}
-                      </div>
-                    ) : lead.outreach_status === "ignored" ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                        Ignorado
-                      </span>
-                    ) : lead.outreach_status === "unsubscribed" ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-400">
-                        Descadastrado
-                      </span>
-                    ) : lead.outreach_status === "bounced" ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-950 dark:text-orange-400">
-                        Email inválido
-                      </span>
-                    ) : lead.outreach_status === "responded" ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-950 dark:text-purple-400">
-                        💬 Respondeu
-                      </span>
-                    ) : lead.email ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                        Pendente
-                      </span>
-                    ) : (
-                      <span className="text-zinc-400 dark:text-zinc-600">-</span>
-                    )}
+                      ) : lead.email ? (
+                        <span className="inline-flex w-fit items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                          Pendente
+                        </span>
+                      ) : (
+                        <span className="text-zinc-400 dark:text-zinc-600">-</span>
+                      )}
+                      {lead.follow_up_sent_at && (
+                        <span className="inline-flex w-fit items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-400">
+                          ↻ Follow-up {formatDate(lead.follow_up_sent_at)}
+                        </span>
+                      )}
+                      {lead.opened_at && (
+                        <span className="inline-flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-400">
+                          👀 Abriu {formatDate(lead.opened_at)}
+                        </span>
+                      )}
+                      {lead.clicked_at && (
+                        <span className="inline-flex w-fit items-center gap-1 rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700 dark:bg-pink-950 dark:text-pink-400">
+                          🔗 Clicou {formatDate(lead.clicked_at)}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-1">
-                      {lead.outreach_status === "contacted" && (
-                        <RespondedButton leadId={lead.id} />
-                      )}
+                      {lead.outreach_status &&
+                        PIPELINE_STATUSES.includes(lead.outreach_status) && (
+                          <PipelineStageSelect
+                            leadId={lead.id}
+                            currentStatus={lead.outreach_status}
+                          />
+                        )}
                       {lead.outreach_status !== "ignored" && (
                         <IgnoreButton leadId={lead.id} />
                       )}

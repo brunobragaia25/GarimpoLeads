@@ -2,16 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-const CATEGORIES = [
-  "advogados",
-  "dentistas",
-  "arquitetos",
-  "clínicas veterinárias",
-  "clínicas de estética",
-  "escritórios de contabilidade",
-  "imobiliárias",
-];
-
 const FOLLOWUP_CATEGORY = "__followup__";
 
 export default function TemplatePage() {
@@ -21,20 +11,29 @@ export default function TemplatePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [configCategories, setConfigCategories] = useState<string[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
 
   useEffect(() => {
     loadTemplate(category);
-    fetch("/api/template?list=1")
+
+    fetch("/api/config")
       .then((res) => res.json())
       .then((data) => {
-        const extra = (data.templates ?? [])
-          .map((t: { category: string | null }) => t.category)
-          .filter(
-            (c: string | null): c is string =>
-              !!c && !CATEGORIES.includes(c) && c !== FOLLOWUP_CATEGORY
-          );
-        setCustomCategories([...new Set(extra)] as string[]);
+        const categories: string[] = data.categories ?? [];
+        setConfigCategories(categories);
+
+        fetch("/api/template?list=1")
+          .then((res) => res.json())
+          .then((templateData) => {
+            const extra = (templateData.templates ?? [])
+              .map((t: { category: string | null }) => t.category)
+              .filter(
+                (c: string | null): c is string =>
+                  !!c && !categories.includes(c) && c !== FOLLOWUP_CATEGORY
+              );
+            setCustomCategories([...new Set(extra)] as string[]);
+          });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -69,7 +68,7 @@ export default function TemplatePage() {
     setSaved(true);
   }
 
-  const allCategories = [...CATEGORIES, ...customCategories];
+  const allCategories = [...configCategories, ...customCategories];
 
   return (
     <div className="min-h-screen bg-zinc-50 p-8 font-sans dark:bg-black">
