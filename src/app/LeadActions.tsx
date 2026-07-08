@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Briefcase, Check, Loader2 } from "lucide-react";
+import { Ban, Briefcase, Check, Loader2, Undo2 } from "lucide-react";
 
 export function IgnoreButton({ leadId }: { leadId: string }) {
   const router = useRouter();
@@ -61,12 +61,38 @@ export function SendToCRMButton({
     }
   }
 
+  async function handleUndo() {
+    if (!confirm("Desfazer o envio pro CRM? Isso APAGA o cliente lá no GestãoDevz também.")) {
+      return;
+    }
+    setLoading(true);
+    const res = await fetch(`/api/leads/${leadId}/send-to-crm`, { method: "DELETE" });
+    const data = await res.json();
+    setLoading(false);
+
+    if (!res.ok) {
+      alert(data.error ?? "Erro ao desfazer");
+      return;
+    }
+    router.refresh();
+  }
+
   if (synced) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
-        <Check className="h-3 w-3" />
-        no CRM
-      </span>
+      <div className="flex items-center gap-1.5">
+        <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+          <Check className="h-3 w-3" />
+          no CRM
+        </span>
+        <button
+          onClick={handleUndo}
+          disabled={loading}
+          title="Desfazer (apaga do GestãoDevz também)"
+          className="text-zinc-400 hover:text-amber-600 disabled:opacity-50 dark:hover:text-amber-400"
+        >
+          <Undo2 className="h-3 w-3" />
+        </button>
+      </div>
     );
   }
 

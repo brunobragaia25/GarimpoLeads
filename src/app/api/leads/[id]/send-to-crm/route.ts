@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { COOKIE_NAME, isValidSessionCookie } from "@/lib/auth";
-import { sendLeadToCRM } from "@/lib/crm";
+import { sendLeadToCRM, deleteLeadFromCRM } from "@/lib/crm";
 
 async function isAuthorized(req: NextRequest): Promise<boolean> {
   const session = req.cookies.get(COOKIE_NAME)?.value;
@@ -44,11 +44,11 @@ export async function POST(
   }
 
   try {
-    await sendLeadToCRM({ name: lead.name, email: outreach.email, phone: lead.phone });
+    const docId = await sendLeadToCRM({ name: lead.name, email: outreach.email, phone: lead.phone });
 
     await supabase
       .from("leads")
-      .update({ crm_synced_at: new Date().toISOString() })
+      .update({ crm_synced_at: new Date().toISOString(), crm_doc_id: docId })
       .eq("id", leadId);
 
     return NextResponse.json({ ok: true });
@@ -56,4 +56,43 @@ export async function POST(
     const message = err instanceof Error ? err.message : "erro desconhecido";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+// Desfaz o envio: apaga o documento no Firestore do GestãoDevz E limpa o
+// rastreamento local, pra poder reenviar depois se precisar.
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id: leadId } = await params;
+
+  const { data: lead } = await supabase
+    .from("leads")
+    .select("crm_doc_id")
+    .eq("id", leadId)
+    .single();
+
+  if (lead?.crm_doc_id) {
+    try {
+      await deleteLeadFromCRM(lead.crm_doc_id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "erro desconhecido";
+      return NextResponse.json({ error: `Erro ao apagar no CRM: ${message}` }, { status: 500 });
+    }
+  }
+
+  const { error } = await supabase
+    .from("leads")
+    .update({ crm_synced_at: null, crm_doc_id: null })
+    .eq("id", leadId);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
 }
