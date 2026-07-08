@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ban } from "lucide-react";
+import { Ban, Briefcase, Check, Loader2 } from "lucide-react";
 
 export function IgnoreButton({ leadId }: { leadId: string }) {
   const router = useRouter();
@@ -31,6 +31,57 @@ export function IgnoreButton({ leadId }: { leadId: string }) {
       <Ban className="h-3 w-3" />
       ignorar
     </button>
+  );
+}
+
+export function SendToCRMButton({
+  leadId,
+  synced,
+}: {
+  leadId: string;
+  synced: boolean;
+}) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSend() {
+    if (!confirm("Enviar esse lead como cliente novo pro GestãoDevz?")) return;
+
+    setLoading(true);
+    setError(null);
+    const res = await fetch(`/api/leads/${leadId}/send-to-crm`, { method: "POST" });
+    const data = await res.json();
+    setLoading(false);
+
+    if (res.ok) {
+      router.refresh();
+    } else {
+      setError(data.error ?? "Erro ao enviar");
+    }
+  }
+
+  if (synced) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+        <Check className="h-3 w-3" />
+        no CRM
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-0.5">
+      <button
+        onClick={handleSend}
+        disabled={loading}
+        className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-emerald-600 disabled:opacity-50 dark:hover:text-emerald-400"
+      >
+        {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Briefcase className="h-3 w-3" />}
+        enviar pro CRM
+      </button>
+      {error && <span className="text-[10px] text-red-500">{error}</span>}
+    </div>
   );
 }
 

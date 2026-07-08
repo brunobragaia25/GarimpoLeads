@@ -13,7 +13,8 @@ create table if not exists leads (
   website text,
   google_maps_url text,
   source text not null default 'google_maps',
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  crm_synced_at timestamptz -- quando foi enviado como cliente pro GestãoDevz
 );
 
 -- Resultado da análise do site do lead

@@ -21,6 +21,7 @@ export interface LeadWithDetails {
   follow_up_sent_at: string | null;
   opened_at: string | null;
   clicked_at: string | null;
+  crm_synced_at: string | null;
 }
 
 // Teto de segurança pra não puxar uma tabela ilimitada de uma vez; o cron
@@ -61,6 +62,7 @@ export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
       follow_up_sent_at: outreach?.follow_up_sent_at ?? null,
       opened_at: outreach?.opened_at ?? null,
       clicked_at: outreach?.clicked_at ?? null,
+      crm_synced_at: lead.crm_synced_at ?? null,
     };
   });
 }

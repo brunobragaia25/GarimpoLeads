@@ -6,7 +6,7 @@ import {
   type EmailFilter,
 } from "@/lib/leads";
 import { SendOutreachButton } from "./SendOutreachButton";
-import { IgnoreButton, PipelineStageSelect } from "./LeadActions";
+import { IgnoreButton, PipelineStageSelect, SendToCRMButton } from "./LeadActions";
 import { PageHeader } from "./PageHeader";
 import {
   Users,
@@ -609,6 +609,12 @@ export default async function Home({
                           )}
                         {lead.outreach_status !== "ignored" && (
                           <IgnoreButton leadId={lead.id} />
+                        )}
+                        {lead.email && (
+                          <SendToCRMButton
+                            leadId={lead.id}
+                            synced={!!lead.crm_synced_at}
+                          />
                         )}
                       </div>
                     </td>
