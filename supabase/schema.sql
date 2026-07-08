@@ -51,6 +51,14 @@ create table if not exists execution_logs (
   duration_ms int
 );
 
+-- Template editável da mensagem de outreach (sempre 1 linha só)
+create table if not exists message_templates (
+  id uuid primary key default uuid_generate_v4(),
+  subject text not null default '',
+  body text not null default '',
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists idx_site_analysis_lead_id on site_analysis(lead_id);
 create index if not exists idx_outreach_lead_id on outreach(lead_id);
 create index if not exists idx_outreach_status on outreach(status);

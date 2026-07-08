@@ -1,4 +1,5 @@
 import { getLeadsWithDetails, isPriorityProspect } from "@/lib/leads";
+import { SendOutreachButton } from "./SendOutreachButton";
 
 export const dynamic = "force-dynamic";
 
@@ -6,17 +7,32 @@ export default async function Home() {
   const leads = await getLeadsWithDetails();
   const prospects = leads.filter(isPriorityProspect).length;
   const withEmail = leads.filter((l) => l.email).length;
+  const pendingToSend = leads.filter(
+    (l) => l.email && l.outreach_status === "pending"
+  ).length;
 
   return (
     <div className="min-h-screen bg-zinc-50 p-8 font-sans dark:bg-black">
       <div className="mx-auto max-w-7xl">
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-          GarimpoLeads
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+            GarimpoLeads
+          </h1>
+          <a
+            href="/template"
+            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+          >
+            editar template de mensagem
+          </a>
+        </div>
         <div className="mt-2 flex gap-6 text-sm text-zinc-600 dark:text-zinc-400">
           <span>{leads.length} leads no total</span>
           <span>{prospects} prospects prioritários</span>
           <span>{withEmail} com email encontrado</span>
+        </div>
+
+        <div className="mt-4">
+          <SendOutreachButton pendingCount={pendingToSend} />
         </div>
 
         <div className="mt-6 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
