@@ -3,6 +3,7 @@ import { searchLeads } from "./google-maps";
 import { deduplicateLeads } from "./deduplication";
 import { analyzeSite } from "./site-analysis";
 import { findEmailForWebsite } from "./hunter";
+import { scrapeEmailFromWebsite } from "./email-scraper";
 
 export async function scrapeLeadsForQuery(category: string, location: string) {
   const found = await searchLeads(category, location);
@@ -68,7 +69,11 @@ export async function analyzePendingSites(limit = 50) {
   };
 }
 
-export async function findPendingEmails(limit = 5) {
+// Estrategia: tenta raspar o email direto do site primeiro (gratis, sem
+// limite de cota). So recorre ao Hunter.io (cota mensal escassa) quando a
+// raspagem nao acha nada. Leads que falham nos dois metodos ficam sem
+// registro em `outreach`, entao sao retentados automaticamente no proximo dia.
+export async function findPendingEmails(hunterLimit = 2, scrapeLimit = 100) {
   const { data: existing } = await supabase.from("outreach").select("lead_id");
   const processedIds = new Set((existing ?? []).map((o) => o.lead_id));
 
@@ -76,21 +81,44 @@ export async function findPendingEmails(limit = 5) {
     .from("leads")
     .select("id, website")
     .not("website", "is", null)
-    .limit(200);
+    .limit(500);
 
   if (error) throw new Error(error.message);
 
-  const pending = (leads ?? []).filter((l) => !processedIds.has(l.id)).slice(0, limit);
+  const pending = (leads ?? [])
+    .filter((l) => !processedIds.has(l.id))
+    .slice(0, scrapeLimit);
 
   const rows = [];
+  let hunterUsed = 0;
+
   for (const lead of pending) {
-    const result = await findEmailForWebsite(lead.website!);
-    rows.push({
-      lead_id: lead.id,
-      email: result.email,
-      email_confidence: result.confidence,
-      status: "pending",
-    });
+    const scraped = await scrapeEmailFromWebsite(lead.website!);
+
+    if (scraped.email) {
+      rows.push({
+        lead_id: lead.id,
+        email: scraped.email,
+        email_confidence: scraped.confidence,
+        status: "pending",
+        notes: `Fonte: ${scraped.source}`,
+      });
+      continue;
+    }
+
+    if (hunterUsed < hunterLimit) {
+      hunterUsed++;
+      const hunterResult = await findEmailForWebsite(lead.website!);
+      rows.push({
+        lead_id: lead.id,
+        email: hunterResult.email,
+        email_confidence: hunterResult.confidence,
+        status: "pending",
+        notes: "Fonte: hunter_domain_search",
+      });
+    }
+    // Se a raspagem falhou e a cota do Hunter acabou, não grava nada:
+    // o lead continua pendente e será retentado no próximo dia.
   }
 
   if (rows.length > 0) {
@@ -101,5 +129,6 @@ export async function findPendingEmails(limit = 5) {
   return {
     processed: rows.length,
     emails_found: rows.filter((r) => r.email).length,
+    hunter_calls_used: hunterUsed,
   };
 }

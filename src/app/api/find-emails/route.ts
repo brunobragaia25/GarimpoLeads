@@ -6,9 +6,10 @@ function isAuthorized(req: NextRequest): boolean {
   return auth === `Bearer ${process.env.CRON_SECRET}`;
 }
 
-// Hunter.io free tier tem cota mensal baixa (poucas dezenas de buscas).
-// Limitamos o processamento por chamada pra não estourar a cota sem querer.
-const DEFAULT_LIMIT = 5;
+// Raspagem direta do site não tem limite de cota; só o fallback via
+// Hunter.io precisa ser limitado (cota mensal baixa no free tier).
+const DEFAULT_HUNTER_LIMIT = 2;
+const DEFAULT_SCRAPE_LIMIT = 100;
 
 export async function POST(req: NextRequest) {
   if (!isAuthorized(req)) {
@@ -16,10 +17,11 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const limit = Math.min(body.limit ?? DEFAULT_LIMIT, 50);
+  const hunterLimit = Math.min(body.hunterLimit ?? DEFAULT_HUNTER_LIMIT, 50);
+  const scrapeLimit = Math.min(body.scrapeLimit ?? DEFAULT_SCRAPE_LIMIT, 500);
 
   try {
-    const result = await findPendingEmails(limit);
+    const result = await findPendingEmails(hunterLimit, scrapeLimit);
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";

@@ -9,8 +9,11 @@ export const maxDuration = 300;
 // até 300s de execução, então isso cabe com folga; ajuste se notar timeout.
 const PAIRS_PER_DAY = 6;
 
-// Hunter.io free tier: 50 buscas/mês ~ 1/dia com margem de segurança.
-const EMAILS_PER_DAY = 1;
+// Raspagem direta do site roda pra todos os leads pendentes (sem limite de
+// cota). Hunter.io só entra como fallback quando a raspagem não acha nada;
+// free tier tem 50 buscas/mês, então 2/dia dá margem de segurança.
+const HUNTER_FALLBACK_PER_DAY = 2;
+const SCRAPE_LIMIT_PER_DAY = 200;
 
 function isAuthorized(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
@@ -47,7 +50,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const emailResult = await findPendingEmails(EMAILS_PER_DAY);
+    const emailResult = await findPendingEmails(HUNTER_FALLBACK_PER_DAY, SCRAPE_LIMIT_PER_DAY);
     emailsFound = emailResult.emails_found;
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";
