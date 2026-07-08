@@ -36,7 +36,6 @@ curl https://seu-projeto.supabase.co/rest/v1/leads?limit=1 \
 ### [ ] Setup APIs
 - [ ] Hunter.io: criar conta (free.hunter.io), copiar API key
 - [ ] Google Maps: criar projeto no Google Cloud, ativar Places API, criar API key
-- [ ] Anthropic: criar conta, gerar API key
 
 ### [ ] Criar `.env.local`
 ```
@@ -44,7 +43,6 @@ SUPABASE_URL=https://seu-projeto.supabase.co
 SUPABASE_ANON_KEY=sua-chave
 HUNTER_API_KEY=sua-chave
 GOOGLE_MAPS_API_KEY=sua-chave
-ANTHROPIC_API_KEY=sua-chave
 CRON_SECRET=seu-secret-aleatorio-40-chars-min
 DATABASE_URL=opcional-postgresql
 ```
@@ -93,7 +91,6 @@ DELETE FROM leads WHERE name = 'Teste Corp';
 - [ ] `lib/deduplication.ts` (dedup leads)
 - [ ] `api/analyze-site.ts` (análise site)
 - [ ] `api/find-email.ts` (buscar emails)
-- [ ] `api/generate-message.ts` (IA)
 - [ ] `api/daily-prospection.ts` (orchestrador)
 
 ### [ ] Testar cada API route
@@ -107,19 +104,6 @@ curl -X POST http://localhost:3000/api/analyze-site \
   -d '{"url":"https://google.com"}'
 
 # Deve retornar JSON com análise
-```
-
-### [ ] Testar generate-message
-```bash
-curl -X POST http://localhost:3000/api/generate-message \
-  -H "Content-Type: application/json" \
-  -d '{
-    "lead": {
-      "name": "Silva Advocacia",
-      "category": "advogado",
-      "website": "https://silva-adv.com.br"
-    }
-  }'
 ```
 
 ### [ ] Testar daily-prospection (sem Supabase ainda)
@@ -293,7 +277,6 @@ console.log('Hunter response:', response.data); // debug
 ### Taxa de requisições
 - Hunter.io: free = 100/mês (1 req/segundo)
 - Google Maps: free = 28k/mês
-- Anthropic: cobrança por token (~1000 msgs = $10)
 
 ### Melhorar velocidade
 ```typescript
@@ -420,10 +403,9 @@ Se tudo funcionar:
 - [ ] Leads sendo scraped
 - [ ] Sites sendo analisados
 - [ ] Emails sendo encontrados
-- [ ] Mensagens sendo geradas
 - [ ] Dashboard mostrando dados
 - [ ] Scheduler executando diariamente
 
 **Parabéns! Sistema está pronto!**
 
-Próximo passo: enviar mensagens automaticamente (Fase 3).
+Próximo passo: escrever e enviar as mensagens manualmente pelo dashboard, e depois considerar enviar automaticamente (Fase 3).

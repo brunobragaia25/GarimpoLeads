@@ -30,7 +30,6 @@ SUPABASE_ANON_KEY=sua-chave-anonima
 # APIs externas
 HUNTER_API_KEY=sua-chave-hunter
 GOOGLE_MAPS_API_KEY=sua-chave-google
-ANTHROPIC_API_KEY=sua-chave-anthropic
 
 # Segurança
 CRON_SECRET=seu-secret-aleatorio-40-caracteres
@@ -50,8 +49,7 @@ prospection/
 │   │   ├── daily-prospection.ts      (Main Orchestrator)
 │   │   ├── scrape-google-maps.ts
 │   │   ├── analyze-site.ts
-│   │   ├── find-email.ts
-│   │   └── generate-message.ts
+│   │   └── find-email.ts
 │   └── page.tsx                      (Dashboard)
 ├── lib/
 │   ├── supabase.ts                   (Client)
@@ -536,113 +534,7 @@ function extractDomain(url: string): string {
 }
 ```
 
-### 3.7 `api/generate-message.ts`
-
-```typescript
-import { NextApiRequest, NextApiResponse } from 'next';
-import { Anthropic } from '@anthropic-ai/sdk';
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY
-});
-
-const templates: Record<string, { pain: string; benefit: string }> = {
-  'advogado': {
-    pain: 'site desatualizado prejudica confiança de clientes',
-    benefit: 'site profissional atrai mais leads jurídicos'
-  },
-  'dentista': {
-    pain: 'pacientes querem agendar online',
-    benefit: 'site com agendamento 24/7 aumenta pacientes'
-  },
-  'farmácia': {
-    pain: 'pouca visibilidade frente às grandes redes',
-    benefit: 'destaque no Google + e-commerce local'
-  },
-  'contador': {
-    pain: 'CNPJ sem presença digital perde clientes',
-    benefit: 'site moderno atrai MEIs e autônomos'
-  },
-  'veterinária': {
-    pain: 'falta galeria de cases e depoimentos',
-    benefit: 'portfólio visual melhora agendamentos'
-  },
-  'estética': {
-    pain: 'Instagram perde seguidores, precisa site próprio',
-    benefit: 'blog + e-commerce gera receita extra'
-  },
-  'tech': {
-    pain: 'portfólio outdated não atrai clientes',
-    benefit: 'portfólio interativo + blog técnico = credibilidade'
-  }
-};
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  const { lead } = req.body;
-
-  if (!lead) {
-    return res.status(400).json({ error: 'Lead required' });
-  }
-
-  try {
-    const message = await generateMessage(lead);
-    return res.json({ message });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message });
-  }
-}
-
-async function generateMessage(lead: any): Promise<string> {
-  const template = templates[lead.category] || templates['advogado'];
-
-  const prompt = `Você é um vendedor consultivo de sites. Gere UM ÚNICA mensagem curta (máx 160 chars) para WhatsApp/email.
-
-Contexto:
-- Empresa: ${lead.name}
-- Categoria: ${lead.category}
-- Situação site: ${lead.site_analysis || 'site desatualizado ou sem site'}
-
-Diretrizes:
-1. Use nome da empresa
-2. Cite O problema específico: "${template.pain}"
-3. Sugira O benefício: "${template.benefit}"
-4. Não venda, convide para conversa
-5. Tom amigável e consultivo
-6. Máx 160 caracteres
-
-Exemplo para advogado:
-"Oi ${lead.name}! Vi que seu site pode melhorar. Sites bem feitos trazem mais clientes pelo Google. Conversa rápida? 👋"
-
-Agora gere para ${lead.category}:`;
-
-  try {
-    const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 200,
-      messages: [
-        { role: 'user', content: prompt }
-      ]
-    });
-
-    const text = message.content[0].type === 'text' ? message.content[0].text : '';
-    
-    // Limpar se passou do limite
-    if (text.length > 160) {
-      return text.substring(0, 157) + '...';
-    }
-    
-    return text;
-  } catch (error) {
-    console.error('Anthropic error:', error);
-    return `Oi ${lead.name}! Seu site pode melhorar. Conversa rápida? 👋`;
-  }
-}
-```
-
-### 3.8 `api/daily-prospection.ts` (MAIN ORCHESTRATOR)
+### 3.7 `api/daily-prospection.ts` (MAIN ORCHESTRATOR)
 
 ```typescript
 import { NextApiRequest, NextApiResponse } from 'next';
@@ -725,36 +617,11 @@ export default async function handler(
     const withEmail = enriched.filter(e => e.email);
     console.log(`✓ Emails found: ${withEmail.length}`);
 
-    // 5. GERAR MENSAGENS
-    const messages = [];
-    for (const lead of enriched) {
-      try {
-        const msgRes = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/generate-message`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lead })
-        });
-        
-        const { message } = await msgRes.json();
-        
-        messages.push({
-          lead_id: lead.id || `temp_${Date.now()}`,
-          message,
-          category: lead.category,
-          created_at: new Date()
-        });
-      } catch (error) {
-        console.error(`Error generating message for ${lead.name}:`, error);
-      }
-    }
-    console.log(`✓ Messages generated: ${messages.length}`);
-
-    // 6. SALVAR EM BANCO (comentado para MVP, ativar quando tiver Supabase)
+    // 5. SALVAR EM BANCO (comentado para MVP, ativar quando tiver Supabase)
     // await insertLeads(enriched);
     // await insertAnalysis(analyzed);
-    // await insertOutreach(messages);
 
-    // 7. LOG
+    // 6. LOG
     const duration = (Date.now() - startTime) / 1000;
     console.log(`✓ Completed in ${duration}s`);
 
@@ -764,7 +631,6 @@ export default async function handler(
     //   leads_scraped: leads.length,
     //   leads_analyzed: analyzed.length,
     //   emails_found: withEmail.length,
-    //   messages_generated: messages.length,
     //   created_at: new Date()
     // });
 
@@ -774,12 +640,10 @@ export default async function handler(
         scraped: leads.length,
         prospects: prospects.length,
         emails: withEmail.length,
-        messages: messages.length,
         duration_seconds: duration.toFixed(2)
       },
       data: {
-        leads: enriched.slice(0, 5),
-        messages: messages.slice(0, 5)
+        leads: enriched.slice(0, 5)
       }
     });
   } catch (error: any) {
@@ -793,7 +657,7 @@ export default async function handler(
 }
 ```
 
-### 3.9 `vercel.json` (Scheduler automático)
+### 3.8 `vercel.json` (Scheduler automático)
 
 ```json
 {
@@ -806,7 +670,7 @@ export default async function handler(
 }
 ```
 
-### 3.10 `app/page.tsx` (Dashboard básico)
+### 3.9 `app/page.tsx` (Dashboard básico)
 
 ```typescript
 'use client';
@@ -872,7 +736,6 @@ export default function Home() {
             <p>Leads: {lastRun.summary?.scraped}</p>
             <p>Prospects: {lastRun.summary?.prospects}</p>
             <p>Emails: {lastRun.summary?.emails}</p>
-            <p>Mensagens: {lastRun.summary?.messages}</p>
           </div>
         )}
       </div>
@@ -980,7 +843,6 @@ SUPABASE_URL=...
 SUPABASE_ANON_KEY=...
 HUNTER_API_KEY=...
 GOOGLE_MAPS_API_KEY=...
-ANTHROPIC_API_KEY=...
 CRON_SECRET=seu-secret-aleatorio
 
 # 4. Deploy automático
@@ -996,7 +858,7 @@ CRON_SECRET=seu-secret-aleatorio
 
 1. **Hoje:** Setup NextJS + banco (Supabase)
 2. **Amanhã:** Implementar scraper + análise site
-3. **Dia 3:** Email finder + IA
+3. **Dia 3:** Email finder
 4. **Dia 4:** Dashboard + export
 5. **Dia 5:** Deploy + primeira execução automática
 

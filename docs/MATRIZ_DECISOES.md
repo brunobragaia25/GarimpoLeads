@@ -65,19 +65,19 @@
 
 ---
 
-## 5. GERAÇÃO DE MENSAGENS - IA QUAL MODELO?
+## 5. GERAÇÃO DE MENSAGENS - IA QUAL MODELO? (FORA DE ESCOPO NO MVP ATUAL)
 
-| Modelo | Custo | Qualidade | Latência | Para MVP |
+Análise mantida como referência caso um dia se decida automatizar a escrita das mensagens. **No MVP atual, essa etapa não é usada:** as mensagens são escritas e enviadas manualmente pelo usuário, sem custo de API de IA.
+
+| Modelo | Custo | Qualidade | Latência | Uso hipotético |
 |--------|-------|-----------|----------|----------|
-| **Claude 3.5 Sonnet** | $10 por 1M tokens | ✓✓✓ Excelente | Rápido | ✓ RECOMENDADO |
-| **GPT-4 Turbo** | $10 por 1M tokens | ✓✓✓ Excelente | Rápido | ✓ Funciona |
-| **GPT-3.5** | $0.50 por 1M tokens | ✓✓ Bom | Rápido | ✓ Mais barato |
-| **Mistral** | $0.27 por 1M tokens | ✓✓ OK | Rápido | ✓ Mais barato |
-| **Llama 2 Local** | $0 | ✓✓ OK | Lento | ✗ Overhead |
+| **Claude 3.5 Sonnet** | $10 por 1M tokens | ✓✓✓ Excelente | Rápido | Se automatizar no futuro |
+| **GPT-4 Turbo** | $10 por 1M tokens | ✓✓✓ Excelente | Rápido | Alternativa |
+| **GPT-3.5** | $0.50 por 1M tokens | ✓✓ Bom | Rápido | Alternativa mais barata |
+| **Mistral** | $0.27 por 1M tokens | ✓✓ OK | Rápido | Alternativa mais barata |
+| **Llama 2 Local** | $0 | ✓✓ OK | Lento | Overhead de infra |
 
-**MVP:** Claude 3.5 Sonnet (~$10/mês para 1000 mensagens)
-
-**Se budget apertado:** GPT-3.5 ou Mistral (5x mais barato, qualidade ok)
+**MVP atual:** Nenhum — mensagens são manuais, custo $0.
 
 ---
 
@@ -151,8 +151,7 @@
 2 estados (SP, RJ)
 ~10 leads/dia
 Hunter.io free
-Claude AI ~$5/mês
-Custo total: $5-10/mês
+Custo total: $0/mês
 ```
 
 ### Fase 2 (Semana 3-4)
@@ -183,11 +182,10 @@ Custo total: $200-500/mês
 ### Se quer RÁPIDO (2-3 dias)
 ✓ Google Maps simples
 ✓ Hunter.io free
-✓ Claude IA
 ✓ Vercel Cron
 ✓ Dashboard HTML puro
-**Tempo:** 30h
-**Custo:** $5-10/mês
+**Tempo:** 25h
+**Custo:** $0/mês
 
 ### Se quer CONFIÁVEL (mas take mais tempo)
 ✓ Google Maps + 2 scrapers
@@ -201,11 +199,10 @@ Custo total: $200-500/mês
 ### Se quer SIMPLES E BARATO
 ✓ Google Maps simples
 ✓ Email patterns + SMTP
-✓ Claude IA
 ✓ Vercel Cron
 ✓ Dashboard básico
-**Tempo:** 25h
-**Custo:** $0-5/mês
+**Tempo:** 20h
+**Custo:** $0/mês
 
 ### Se quer PRODUÇÃO DIA 1
 ✓ Usar template pronto (Next.js boilerplate)
@@ -233,11 +230,10 @@ Backend:         API Routes (Integrado)
 Database:        Supabase (Free + SQL)
 Scraping:        Google Maps + axios/cheerio
 Email:           Hunter.io (free 100/mês)
-IA:              Claude 3.5 Sonnet ($10/mês)
 Scheduler:       Vercel Cron (nativo)
 Deploy:          Vercel (parceira oficial)
-Total MVP:       $10-20/mês
-Total Fase 2:    $60-100/mês
+Total MVP:       $0/mês
+Total Fase 2:    $50-80/mês
 ```
 
 **Por quê?**
@@ -255,7 +251,7 @@ Total Fase 2:    $60-100/mês
 
 1. **Setup (2h)**
    - NextJS + Supabase
-   - APIs (Hunter, Anthropic, Google Maps)
+   - APIs (Hunter, Google Maps)
 
 2. **Database (1h)**
    - Criar tabelas no Supabase
@@ -272,24 +268,20 @@ Total Fase 2:    $60-100/mês
    - Hunter.io integrado
    - Fallback patterns
 
-6. **IA (2h)**
-   - Claude + prompts
-   - 1 template por categoria
-
-7. **Orchestration (3h)**
+6. **Orchestration (3h)**
    - API route que coordena tudo
 
-8. **Dashboard (2h)**
+7. **Dashboard (2h)**
    - Tabela HTML simples
    - Botão de execução
 
-9. **Scheduler (1h)**
+8. **Scheduler (1h)**
    - vercel.json com Cron
 
-10. **Deploy (1h)**
+9. **Deploy (1h)**
     - Push GitHub → auto deploy Vercel
 
-**Total: ~21 horas (3 dias de trabalho integral)**
+**Total: ~19 horas (2-3 dias de trabalho integral)**
 
 ---
 

@@ -613,7 +613,6 @@ CREATE TABLE execution_logs (
   leads_scraped INT,
   leads_analyzed INT,
   emails_found INT,
-  messages_generated INT,
   error_message TEXT,
   error_stack TEXT,
   created_at TIMESTAMP DEFAULT NOW()
@@ -701,7 +700,6 @@ await addDoc(collection(db, 'leads'), {
 - [ ] Scraper Google Maps básico (1-2 categorias)
 - [ ] Análise WordPress simples (apenas checar `wp-content`)
 - [ ] Hunter.io integrado (100 emails/mês grátis)
-- [ ] Geração de mensagem simples (1 template)
 - [ ] Scheduler manual (você executa `/api/daily-prospection` manualmente via curl)
 - [ ] Dashboard básica (tabela com leads)
 - [ ] Export CSV
@@ -749,7 +747,6 @@ npm install \
   puppeteer \
   lighthouse \
   @googlemaps/js-client \
-  @anthropic-ai/sdk \
   dotenv
 
 # 3. Criar arquivo .env.local
@@ -758,7 +755,6 @@ SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_ANON_KEY=xxx
 DATABASE_URL=postgresql://xxx
 HUNTER_API_KEY=xxx
-ANTHROPIC_API_KEY=xxx
 GOOGLE_MAPS_API_KEY=xxx
 CRON_SECRET=seu-secret-aleatorio
 EOF
@@ -779,27 +775,22 @@ EOF
 - [ ] Criar fallback com email patterns
 - [ ] Testar validação SMTP gratuita
 
-### Dia 6: IA + Mensagens
-- [ ] Criar `lib/message-generator.ts`
-- [ ] Testar com diferentes categorias
-- [ ] Refinar prompts
-
-### Dia 7: Integração Banco
+### Dia 6: Integração Banco
 - [ ] Criar schema Supabase
 - [ ] Conectar Supabase client
-- [ ] Salvar leads/análises/mensagens
+- [ ] Salvar leads/análises
 
-### Dia 8: API Routes
+### Dia 7: API Routes
 - [ ] Criar `/api/daily-prospection` completo
 - [ ] Integrar todas as funções
 - [ ] Testes end-to-end
 
-### Dia 9: Dashboard
+### Dia 8: Dashboard
 - [ ] Criar página inicial com tabela de leads
 - [ ] Botões de ação (exportar, revisar, etc)
 - [ ] Filtros por categoria/fonte
 
-### Dia 10: Deploy + Scheduler
+### Dia 9-10: Deploy + Scheduler
 - [ ] Deploy no Vercel
 - [ ] Configurar `vercel.json` com cron
 - [ ] Testes com primeira execução automática
@@ -816,8 +807,7 @@ import { scrapeGoogleMaps } from '@/lib/google-maps';
 import { scrapeDirectories } from '@/lib/scrapers';
 import { analyzeSites } from '@/lib/site-analyzer';
 import { enrichWithEmails } from '@/lib/email-finder';
-import { generateOutreach } from '@/lib/message-generator';
-import { saveLeads, saveAnalysis, saveOutreach, logExecution } from '@/lib/db';
+import { saveLeads, saveAnalysis, logExecution } from '@/lib/db';
 
 export default async function handler(
   req: NextApiRequest,
@@ -852,17 +842,11 @@ export default async function handler(
     
     console.log(`✓ Enriched with emails: ${withEmail.length}`);
 
-    // 4. GENERATE MESSAGES
-    const messages = await generateOutreach(enriched);
-    
-    console.log(`✓ Generated: ${messages.length} messages`);
-
-    // 5. SAVE TO DATABASE
+    // 4. SAVE TO DATABASE
     await saveLeads(enriched);
     await saveAnalysis(analyzed);
-    await saveOutreach(messages);
 
-    // 6. LOG EXECUTION
+    // 5. LOG EXECUTION
     const duration = (Date.now() - startTime) / 1000;
     await logExecution({
       status: 'success',
@@ -870,7 +854,6 @@ export default async function handler(
       leads_analyzed: analyzed.length,
       leads_prospect: prospects.length,
       emails_found: withEmail.length,
-      messages_generated: messages.length,
       duration_seconds: duration
     });
 
@@ -882,7 +865,6 @@ export default async function handler(
         scraped: allLeads.length,
         prospects: prospects.length,
         emails: withEmail.length,
-        messages: messages.length,
         duration_seconds: duration
       }
     });
@@ -933,16 +915,15 @@ function deduplicateLeads(leads: any[]) {
 | **Supabase** | Free (até 500MB) → Pro | $25-100 |
 | **Hunter.io** | Free (100/mês) → Starter | $49 |
 | **Google Maps API** | 28k buscas grátis | $0 → $320 |
-| **Anthropic API** | Pay-as-you-go | ~$10 (1000 msgs/mês) |
 | **Puppeteer (browser)** | Inclusive no hosting | $0 |
 | **GitHub Actions** | Gratuito | $0 |
-| | **TOTAL** | **~$100-200/mês** |
+| | **TOTAL** | **~$90-190/mês** |
 
 **Redução de custo (MVP):**
-- Use free tiers: Hunter (100/mês), Google Maps (28k), Anthropic (reserve $10)
+- Use free tiers: Hunter (100/mês), Google Maps (28k)
 - Hospede no Render/Railway (free tier): $0
 - Use GitHub Actions (gratuito)
-- **TOTAL MVP: $0-50/mês**
+- **TOTAL MVP: $0/mês**
 
 ---
 
@@ -953,7 +934,6 @@ MVP (Pronto em 2 semanas):
 - [ ] Google Maps scraper (1-2 categorias)
 - [ ] Site analyzer (WordPress detection básico)
 - [ ] Hunter.io integrado
-- [ ] Message generator (1 template)
 - [ ] Dashboard com tabela
 - [ ] CSV export
 - [ ] Manual `/api/daily-prospection` trigger
@@ -975,7 +955,6 @@ Fase 2 (Pronto em 4 semanas):
 - Puppeteer: https://pptr.dev
 - Lighthouse: https://github.com/GoogleChrome/lighthouse
 - Google Maps API: https://developers.google.com/maps/documentation/places/web-service/search
-- Anthropic SDK: https://github.com/anthropics/anthropic-sdk-python
 
 ---
 
