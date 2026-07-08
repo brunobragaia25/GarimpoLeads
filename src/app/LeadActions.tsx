@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Ban } from "lucide-react";
 
 export function IgnoreButton({ leadId }: { leadId: string }) {
   const router = useRouter();
@@ -25,8 +26,9 @@ export function IgnoreButton({ leadId }: { leadId: string }) {
     <button
       onClick={handleIgnore}
       disabled={loading}
-      className="text-xs text-zinc-400 hover:text-red-600 hover:underline disabled:opacity-50 dark:hover:text-red-400"
+      className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-red-600 disabled:opacity-50 dark:hover:text-red-400"
     >
+      <Ban className="h-3 w-3" />
       ignorar
     </button>
   );
