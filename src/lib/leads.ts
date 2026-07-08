@@ -17,13 +17,19 @@ export interface LeadWithDetails {
   email: string | null;
   email_confidence: number | null;
   outreach_status: string | null;
+  contacted_at: string | null;
 }
+
+// Teto de segurança pra não puxar uma tabela ilimitada de uma vez; o cron
+// adiciona algumas centenas de leads por semana, então isso cobre meses.
+const MAX_LEADS = 5000;
 
 export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
   const { data, error } = await supabase
     .from("leads")
     .select("*, site_analysis(*), outreach(*)")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(MAX_LEADS);
 
   if (error) throw new Error(error.message);
 
@@ -48,6 +54,7 @@ export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
       email: outreach?.email ?? null,
       email_confidence: outreach?.email_confidence ?? null,
       outreach_status: outreach?.status ?? null,
+      contacted_at: outreach?.contacted_at ?? null,
     };
   });
 }
@@ -59,4 +66,14 @@ export function isPriorityProspect(lead: LeadWithDetails): boolean {
     lead.is_slow === true ||
     lead.is_outdated === true
   );
+}
+
+export type EmailFilter = "all" | "no_email" | "pending" | "contacted";
+
+export function matchesEmailFilter(lead: LeadWithDetails, filter: EmailFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "no_email") return !lead.email;
+  if (filter === "pending") return !!lead.email && lead.outreach_status === "pending";
+  if (filter === "contacted") return lead.outreach_status === "contacted";
+  return true;
 }
