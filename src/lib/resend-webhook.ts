@@ -23,7 +23,15 @@ export async function verifyResendWebhook(
   const secret = process.env.RESEND_WEBHOOK_SECRET;
   if (!secret) return false;
 
-  const secretBytes = base64ToBytes(secret.replace(/^whsec_/, ""));
+  let secretBytes: Uint8Array;
+  try {
+    secretBytes = base64ToBytes(secret.replace(/^whsec_/, ""));
+  } catch {
+    // Segredo mal configurado (base64 inválido) - trata como assinatura
+    // inválida em vez de derrubar a rota com 500.
+    return false;
+  }
+
   const signedContent = `${svixId}.${svixTimestamp}.${body}`;
 
   const key = await crypto.subtle.importKey(
