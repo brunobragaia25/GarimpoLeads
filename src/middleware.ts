@@ -15,5 +15,5 @@ export async function middleware(req: NextRequest) {
 // As rotas /api/* têm sua própria autenticação via Bearer CRON_SECRET
 // (usada pelo cron e chamadas manuais), então ficam fora deste middleware.
 export const config = {
-  matcher: ["/((?!login|api|_next|favicon.ico).*)"],
+  matcher: ["/((?!login|api|_next|favicon.ico|icon|apple-icon).*)"],
 };
