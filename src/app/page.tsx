@@ -7,15 +7,12 @@ import {
 } from "@/lib/leads";
 import { SendOutreachButton } from "./SendOutreachButton";
 import { IgnoreButton, PipelineStageSelect } from "./LeadActions";
+import { PageHeader } from "./PageHeader";
 import {
   Users,
   Flame,
   MailCheck,
-  Send,
   Download,
-  Pencil,
-  Gauge,
-  Settings,
   Phone,
   MessageCircle,
   Globe,
@@ -130,18 +127,6 @@ function buildQuery(params: Record<string, string | undefined>): string {
   }
   const qs = search.toString();
   return qs ? `?${qs}` : "";
-}
-
-function NavLink({ href, icon: Icon, children }: { href: string; icon: LucideIcon; children: React.ReactNode }) {
-  return (
-    <a
-      href={href}
-      className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50"
-    >
-      <Icon className="h-4 w-4" />
-      {children}
-    </a>
-  );
 }
 
 function SortableHeader({
@@ -296,35 +281,19 @@ export default async function Home({
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-black">
-      {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-zinc-800 dark:bg-black/80">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
-              <Flame className="h-4.5 w-4.5" />
-            </div>
-            <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-              GarimpoLeads
-            </h1>
-          </div>
-          <nav className="flex flex-wrap items-center gap-1">
-            <NavLink href={`/api/export${buildQuery(baseParams)}`} icon={Download}>
-              Exportar
-            </NavLink>
-            <NavLink href="/template" icon={Pencil}>
-              Template
-            </NavLink>
-            <NavLink href="/usage" icon={Gauge}>
-              Uso e cotas
-            </NavLink>
-            <NavLink href="/settings" icon={Settings}>
-              Configurações
-            </NavLink>
-          </nav>
-        </div>
-      </header>
+      <PageHeader active="/" />
 
       <main className="px-6 py-6">
+        <div className="flex items-center justify-end">
+          <a
+            href={`/api/export${buildQuery(baseParams)}`}
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50"
+          >
+            <Download className="h-4 w-4" />
+            Exportar CSV
+          </a>
+        </div>
+
         {/* Stat cards */}
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <StatCard
