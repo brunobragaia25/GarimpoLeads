@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const cronSecretConfigured = !!process.env.CRON_SECRET;
+  const cronSecretMatches = auth === `Bearer ${process.env.CRON_SECRET}`;
 
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -18,6 +17,8 @@ export async function GET(req: NextRequest) {
   const body = await res.text();
 
   return NextResponse.json({
+    cron_secret_configured: cronSecretConfigured,
+    cron_secret_matches: cronSecretMatches,
     token_length: token?.length ?? 0,
     token_preview: token ? `${token.slice(0, 6)}...${token.slice(-4)}` : null,
     chat_id: chatId,
