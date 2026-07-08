@@ -1,13 +1,70 @@
 import { supabase } from "./supabase";
-import { getTemplate, renderTemplate } from "./template";
+import { getTemplate, getFollowUpTemplate, renderTemplate, type MessageTemplate } from "./template";
 import { sendOutreachEmail } from "./resend";
+import { createUnsubscribeToken } from "./unsubscribe";
+
+async function buildTemplateResolver() {
+  const cache = new Map<string, MessageTemplate>();
+  return async (category: string): Promise<MessageTemplate> => {
+    if (!cache.has(category)) {
+      cache.set(category, await getTemplate(category));
+    }
+    return cache.get(category)!;
+  };
+}
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Domínio recém-verificado: começa devagar pra construir reputação de envio
+// antes de escalar. Ajustável via env var conforme a reputação for subindo.
+const DEFAULT_DAILY_LIMIT = 30;
+
+// Envios iniciais e follow-ups dividem a mesma cota diária, pra proteger a
+// reputação do domínio como um todo (não só o primeiro contato).
+async function countSentToday(): Promise<number> {
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const iso = startOfDay.toISOString();
+
+  const { count: initial } = await supabase
+    .from("outreach")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "contacted")
+    .gte("contacted_at", iso);
+
+  const { count: followUps } = await supabase
+    .from("outreach")
+    .select("*", { count: "exact", head: true })
+    .gte("follow_up_sent_at", iso);
+
+  return (initial ?? 0) + (followUps ?? 0);
+}
+
+function appendUnsubscribeFooter(body: string, leadId: string, token: string): string {
+  const link = `${process.env.APP_URL}/api/unsubscribe?lead=${leadId}&token=${token}`;
+  return `${body}\n\n---\nSe não quiser mais receber esses emails, clique aqui: ${link}`;
+}
+
 export async function sendPendingOutreach(limit = 100, leadId?: string) {
-  const template = await getTemplate();
+  const resolveTemplate = await buildTemplateResolver();
+  const dailyLimit = Number(process.env.SEND_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
+
+  const alreadySentToday = await countSentToday();
+  const remainingToday = Math.max(0, dailyLimit - alreadySentToday);
+  const effectiveLimit = leadId ? limit : Math.min(limit, remainingToday);
+
+  if (effectiveLimit === 0) {
+    return {
+      sent: 0,
+      failed: 0,
+      total: 0,
+      daily_limit_reached: true,
+      sent_today: alreadySentToday,
+      daily_limit: dailyLimit,
+    };
+  }
 
   let query = supabase
     .from("outreach")
@@ -20,7 +77,7 @@ export async function sendPendingOutreach(limit = 100, leadId?: string) {
     query = query.eq("lead_id", leadId);
   }
 
-  const { data: rows, error } = await query.limit(limit);
+  const { data: rows, error } = await query.limit(effectiveLimit);
 
   if (error) throw new Error(error.message);
 
@@ -31,14 +88,17 @@ export async function sendPendingOutreach(limit = 100, leadId?: string) {
     const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads;
     if (!lead || !row.email) continue;
 
+    const template = await resolveTemplate(lead.category);
     const rendered = renderTemplate(template, {
       name: lead.name,
       category: lead.category,
       address: lead.address,
     });
+    const token = await createUnsubscribeToken(row.lead_id);
+    const bodyWithFooter = appendUnsubscribeFooter(rendered.body, row.lead_id, token);
 
     try {
-      await sendOutreachEmail(row.email, rendered.subject, rendered.body);
+      await sendOutreachEmail(row.email, rendered.subject, bodyWithFooter);
       await supabase
         .from("outreach")
         .update({ status: "contacted", contacted_at: new Date().toISOString() })
@@ -51,6 +111,78 @@ export async function sendPendingOutreach(limit = 100, leadId?: string) {
     }
 
     // Resend free tier tem limite de ~2 req/s; respeita esse ritmo.
+    await sleep(600);
+  }
+
+  return {
+    sent,
+    failed,
+    total: (rows ?? []).length,
+    daily_limit_reached: false,
+    sent_today: alreadySentToday + sent,
+    daily_limit: dailyLimit,
+  };
+}
+
+// Reenvia pra quem foi contatado há mais de `daysThreshold` dias e ainda não
+// recebeu follow-up. Compartilha a mesma cota diária dos envios iniciais.
+export async function sendFollowUps(daysThreshold = 5, limit = 20) {
+  const dailyLimit = Number(process.env.SEND_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
+  const alreadySentToday = await countSentToday();
+  const remainingToday = Math.max(0, dailyLimit - alreadySentToday);
+  const effectiveLimit = Math.min(limit, remainingToday);
+
+  if (effectiveLimit === 0) {
+    return { sent: 0, failed: 0, total: 0 };
+  }
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - daysThreshold);
+
+  const { data: rows, error } = await supabase
+    .from("outreach")
+    .select("id, lead_id, email, leads(name, category, address)")
+    .eq("status", "contacted")
+    .is("follow_up_sent_at", null)
+    .lte("contacted_at", cutoff.toISOString())
+    .not("email", "is", null)
+    .order("contacted_at", { ascending: true })
+    .limit(effectiveLimit);
+
+  if (error) throw new Error(error.message);
+
+  const template = await getFollowUpTemplate();
+  let sent = 0;
+  let failed = 0;
+
+  for (const row of rows ?? []) {
+    const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads;
+    if (!lead || !row.email) continue;
+
+    const rendered = renderTemplate(template, {
+      name: lead.name,
+      category: lead.category,
+      address: lead.address,
+    });
+    const token = await createUnsubscribeToken(row.lead_id);
+    const bodyWithFooter = appendUnsubscribeFooter(rendered.body, row.lead_id, token);
+
+    try {
+      await sendOutreachEmail(row.email, rendered.subject, bodyWithFooter);
+      await supabase
+        .from("outreach")
+        .update({ follow_up_sent_at: new Date().toISOString() })
+        .eq("id", row.id);
+      sent++;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "erro desconhecido";
+      await supabase
+        .from("outreach")
+        .update({ notes: `Falha no follow-up: ${message}` })
+        .eq("id", row.id);
+      failed++;
+    }
+
     await sleep(600);
   }
 

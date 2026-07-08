@@ -2,9 +2,11 @@ import {
   getLeadsWithDetails,
   isPriorityProspect,
   matchesEmailFilter,
+  computeLeadScore,
   type EmailFilter,
 } from "@/lib/leads";
 import { SendOutreachButton } from "./SendOutreachButton";
+import { IgnoreButton, RespondedButton } from "./LeadActions";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,14 @@ function formatDate(iso: string | null): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function whatsappLink(phone: string | null): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 10) return null;
+  const withCountryCode = digits.startsWith("55") ? digits : `55${digits}`;
+  return `https://wa.me/${withCountryCode}`;
 }
 
 function buildQuery(params: Record<string, string | undefined>): string {
@@ -39,18 +49,29 @@ export default async function Home({
   const category = params.category ?? "";
   const status = (params.status as EmailFilter) ?? "all";
   const search = (params.search ?? "").trim().toLowerCase();
+  const priorityOnly = params.priority === "1";
+  const siteFilter = params.site ?? "";
+  const sortBy = params.sort === "score" ? "score" : "recent";
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
   const allLeads = await getLeadsWithDetails();
 
   const categories = [...new Set(allLeads.map((l) => l.category))].sort();
 
-  const filtered = allLeads.filter((lead) => {
-    if (category && lead.category !== category) return false;
-    if (!matchesEmailFilter(lead, status)) return false;
-    if (search && !lead.name.toLowerCase().includes(search)) return false;
-    return true;
-  });
+  const filtered = allLeads
+    .filter((lead) => {
+      if (category && lead.category !== category) return false;
+      if (!matchesEmailFilter(lead, status)) return false;
+      if (search && !lead.name.toLowerCase().includes(search)) return false;
+      if (priorityOnly && !isPriorityProspect(lead)) return false;
+      if (siteFilter === "with" && !lead.website) return false;
+      if (siteFilter === "without" && lead.website) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "score") return computeLeadScore(b) - computeLeadScore(a);
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
   const prospects = allLeads.filter(isPriorityProspect).length;
   const withEmail = allLeads.filter((l) => l.email).length;
@@ -66,7 +87,14 @@ export default async function Home({
     currentPage * PAGE_SIZE
   );
 
-  const baseParams = { category, status, search };
+  const baseParams = {
+    category,
+    status,
+    search,
+    priority: priorityOnly ? "1" : undefined,
+    site: siteFilter || undefined,
+    sort: sortBy === "score" ? "score" : undefined,
+  };
 
   return (
     <div className="min-h-screen bg-zinc-50 p-8 font-sans dark:bg-black">
@@ -75,16 +103,26 @@ export default async function Home({
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
             GarimpoLeads
           </h1>
-          <a
-            href="/template"
-            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
-          >
-            editar template de mensagem
-          </a>
+          <div className="flex gap-4">
+            <a
+              href={`/api/export${buildQuery(baseParams)}`}
+              className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+            >
+              exportar CSV
+            </a>
+            <a
+              href="/template"
+              className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+            >
+              editar template de mensagem
+            </a>
+          </div>
         </div>
         <div className="mt-2 flex flex-wrap gap-6 text-sm text-zinc-600 dark:text-zinc-400">
           <span>{allLeads.length} leads no total</span>
-          <span>{prospects} prospects prioritários</span>
+          <a href={buildQuery({ ...baseParams, priority: "1" })} className="hover:underline">
+            {prospects} prospects prioritários
+          </a>
           <span>{withEmail} com email encontrado</span>
           <span>{contacted} já enviados</span>
         </div>
@@ -128,6 +166,25 @@ export default async function Home({
               <option value="no_email">Sem email</option>
               <option value="pending">Pendente de envio</option>
               <option value="contacted">Já enviado</option>
+              <option value="ignored">Ignorado</option>
+              <option value="unsubscribed">Descadastrado</option>
+              <option value="bounced">Email inválido (bounce)</option>
+              <option value="responded">Respondeu</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Site
+            </label>
+            <select
+              name="site"
+              defaultValue={siteFilter}
+              className="mt-1 rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+            >
+              <option value="">Todos</option>
+              <option value="with">Com site</option>
+              <option value="without">Sem site</option>
             </select>
           </div>
 
@@ -144,13 +201,41 @@ export default async function Home({
             />
           </div>
 
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Ordenar por
+            </label>
+            <select
+              name="sort"
+              defaultValue={sortBy}
+              className="mt-1 rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+            >
+              <option value="recent">Mais recentes</option>
+              <option value="score">Prioridade (score)</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 pb-1.5">
+            <input
+              type="checkbox"
+              id="priority"
+              name="priority"
+              value="1"
+              defaultChecked={priorityOnly}
+              className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700"
+            />
+            <label htmlFor="priority" className="text-sm text-zinc-700 dark:text-zinc-300">
+              só prioritários
+            </label>
+          </div>
+
           <button
             type="submit"
             className="rounded-md bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white dark:bg-zinc-50 dark:text-zinc-900"
           >
             Filtrar
           </button>
-          {(category || status !== "all" || search) && (
+          {(category || status !== "all" || search || priorityOnly || siteFilter) && (
             <a
               href="/"
               className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
@@ -168,6 +253,7 @@ export default async function Home({
           <table className="w-full text-left text-sm">
             <thead className="bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
               <tr>
+                <th className="px-4 py-3">Score</th>
                 <th className="px-4 py-3">Nome</th>
                 <th className="px-4 py-3">Categoria</th>
                 <th className="px-4 py-3">Telefone</th>
@@ -176,6 +262,7 @@ export default async function Home({
                 <th className="px-4 py-3">Performance</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Status envio</th>
+                <th className="px-4 py-3">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -188,6 +275,9 @@ export default async function Home({
                       : ""
                   }`}
                 >
+                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                    {computeLeadScore(lead)}
+                  </td>
                   <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-50">
                     {lead.name}
                   </td>
@@ -195,7 +285,19 @@ export default async function Home({
                     {lead.category}
                   </td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                    {lead.phone ?? "-"}
+                    <div className="flex items-center gap-2">
+                      <span>{lead.phone ?? "-"}</span>
+                      {!lead.website && whatsappLink(lead.phone) && (
+                        <a
+                          href={whatsappLink(lead.phone)!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:hover:bg-emerald-900"
+                        >
+                          WhatsApp
+                        </a>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     {lead.website ? (
@@ -222,8 +324,31 @@ export default async function Home({
                   </td>
                   <td className="px-4 py-3">
                     {lead.outreach_status === "contacted" ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
-                        ✓ Enviado {formatDate(lead.contacted_at)}
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+                          ✓ Enviado {formatDate(lead.contacted_at)}
+                        </span>
+                        {lead.follow_up_sent_at && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-400">
+                            ↻ Follow-up {formatDate(lead.follow_up_sent_at)}
+                          </span>
+                        )}
+                      </div>
+                    ) : lead.outreach_status === "ignored" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                        Ignorado
+                      </span>
+                    ) : lead.outreach_status === "unsubscribed" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-400">
+                        Descadastrado
+                      </span>
+                    ) : lead.outreach_status === "bounced" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-950 dark:text-orange-400">
+                        Email inválido
+                      </span>
+                    ) : lead.outreach_status === "responded" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-950 dark:text-purple-400">
+                        💬 Respondeu
                       </span>
                     ) : lead.email ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
@@ -232,6 +357,16 @@ export default async function Home({
                     ) : (
                       <span className="text-zinc-400 dark:text-zinc-600">-</span>
                     )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col gap-1">
+                      {lead.outreach_status === "contacted" && (
+                        <RespondedButton leadId={lead.id} />
+                      )}
+                      {lead.outreach_status !== "ignored" && (
+                        <IgnoreButton leadId={lead.id} />
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

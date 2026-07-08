@@ -35,8 +35,9 @@ create table if not exists outreach (
   lead_id uuid not null references leads(id) on delete cascade,
   email text,
   email_confidence int, -- score do Hunter.io
-  status text not null default 'pending', -- pending | contacted | responded | ignored
+  status text not null default 'pending', -- pending | contacted | responded | ignored | unsubscribed | bounced
   contacted_at timestamptz,
+  follow_up_sent_at timestamptz,
   notes text,
   created_at timestamptz not null default now()
 );
@@ -51,13 +52,18 @@ create table if not exists execution_logs (
   duration_ms int
 );
 
--- Template editável da mensagem de outreach (sempre 1 linha só)
+-- Template editável da mensagem de outreach. `category = null` é o template
+-- padrão (fallback); pode ter 1 template específico por categoria também.
 create table if not exists message_templates (
   id uuid primary key default uuid_generate_v4(),
+  category text,
   subject text not null default '',
   body text not null default '',
   updated_at timestamptz not null default now()
 );
+
+create unique index if not exists idx_message_templates_category
+  on message_templates ((coalesce(category, '')));
 
 create index if not exists idx_site_analysis_lead_id on site_analysis(lead_id);
 create index if not exists idx_outreach_lead_id on outreach(lead_id);

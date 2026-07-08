@@ -18,6 +18,7 @@ export interface LeadWithDetails {
   email_confidence: number | null;
   outreach_status: string | null;
   contacted_at: string | null;
+  follow_up_sent_at: string | null;
 }
 
 // Teto de segurança pra não puxar uma tabela ilimitada de uma vez; o cron
@@ -55,6 +56,7 @@ export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
       email_confidence: outreach?.email_confidence ?? null,
       outreach_status: outreach?.status ?? null,
       contacted_at: outreach?.contacted_at ?? null,
+      follow_up_sent_at: outreach?.follow_up_sent_at ?? null,
     };
   });
 }
@@ -68,12 +70,38 @@ export function isPriorityProspect(lead: LeadWithDetails): boolean {
   );
 }
 
-export type EmailFilter = "all" | "no_email" | "pending" | "contacted";
+// Pontuação heurística de "quão provável é fechar negócio": sem site é o
+// sinal mais forte (nem tem presença online), seguido de site lento/antigo.
+export function computeLeadScore(lead: LeadWithDetails): number {
+  let score = 0;
+  if (lead.has_website === false) score += 100;
+  if (lead.is_wordpress) score += 30;
+  if (lead.is_slow) score += 30;
+  if (lead.is_outdated) score += 20;
+  if (lead.performance_score !== null) {
+    score += Math.max(0, 100 - lead.performance_score) * 0.2;
+  }
+  return Math.round(score);
+}
+
+export type EmailFilter =
+  | "all"
+  | "no_email"
+  | "pending"
+  | "contacted"
+  | "ignored"
+  | "unsubscribed"
+  | "bounced"
+  | "responded";
 
 export function matchesEmailFilter(lead: LeadWithDetails, filter: EmailFilter): boolean {
   if (filter === "all") return true;
   if (filter === "no_email") return !lead.email;
   if (filter === "pending") return !!lead.email && lead.outreach_status === "pending";
   if (filter === "contacted") return lead.outreach_status === "contacted";
+  if (filter === "ignored") return lead.outreach_status === "ignored";
+  if (filter === "unsubscribed") return lead.outreach_status === "unsubscribed";
+  if (filter === "bounced") return lead.outreach_status === "bounced";
+  if (filter === "responded") return lead.outreach_status === "responded";
   return true;
 }

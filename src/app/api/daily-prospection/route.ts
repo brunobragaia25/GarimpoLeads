@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { scrapeLeadsForQuery, analyzePendingSites, findPendingEmails } from "@/lib/pipeline";
+import { sendFollowUps } from "@/lib/send-outreach";
 import { getPairsForDay } from "@/config/prospection";
 
 export const maxDuration = 300;
@@ -14,6 +15,10 @@ const PAIRS_PER_DAY = 6;
 // free tier tem 50 buscas/mês, então 2/dia dá margem de segurança.
 const HUNTER_FALLBACK_PER_DAY = 2;
 const SCRAPE_LIMIT_PER_DAY = 200;
+
+// Follow-up automático pra quem foi contatado e não respondeu.
+const FOLLOWUP_DAYS_THRESHOLD = 5;
+const FOLLOWUP_LIMIT_PER_DAY = 20;
 
 function isAuthorized(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
@@ -29,6 +34,7 @@ export async function GET(req: NextRequest) {
   const errors: string[] = [];
   let leadsFound = 0;
   let emailsFound = 0;
+  let followUpsSent = 0;
 
   const pairs = getPairsForDay(new Date(), PAIRS_PER_DAY);
 
@@ -57,6 +63,14 @@ export async function GET(req: NextRequest) {
     errors.push(`find-emails: ${message}`);
   }
 
+  try {
+    const followUpResult = await sendFollowUps(FOLLOWUP_DAYS_THRESHOLD, FOLLOWUP_LIMIT_PER_DAY);
+    followUpsSent = followUpResult.sent;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "erro desconhecido";
+    errors.push(`follow-ups: ${message}`);
+  }
+
   const durationMs = Date.now() - startedAt;
 
   await supabase.from("execution_logs").insert({
@@ -70,6 +84,7 @@ export async function GET(req: NextRequest) {
     pairs_processed: pairs,
     leads_found: leadsFound,
     emails_found: emailsFound,
+    follow_ups_sent: followUpsSent,
     errors,
     duration_ms: durationMs,
   });
