@@ -4,12 +4,16 @@ export async function notifyTelegram(text: string): Promise<void> {
   if (!token || !chatId) return;
 
   try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chat_id: chatId, text }),
     });
-  } catch {
-    // Notificação é best-effort; não deve derrubar o fluxo principal se falhar.
+    if (!res.ok) {
+      const errorBody = await res.text();
+      console.error("Telegram notify failed:", res.status, errorBody);
+    }
+  } catch (err) {
+    console.error("Telegram notify exception:", err);
   }
 }
