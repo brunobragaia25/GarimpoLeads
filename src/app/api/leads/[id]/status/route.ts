@@ -37,18 +37,27 @@ export async function POST(
 
   const { data: existing } = await supabase
     .from("outreach")
-    .select("id")
+    .select("id, contacted_at")
     .eq("lead_id", leadId)
     .maybeSingle();
+
+  // Envio automatico por email ja grava contacted_at na hora do envio; aqui
+  // so preenchemos se ainda nao tiver (ex: contato manual via WhatsApp).
+  const contactedAtUpdate =
+    status === "contacted" && !existing?.contacted_at
+      ? { contacted_at: new Date().toISOString() }
+      : {};
 
   if (existing) {
     const { error } = await supabase
       .from("outreach")
-      .update({ status })
+      .update({ status, ...contactedAtUpdate })
       .eq("id", existing.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   } else {
-    const { error } = await supabase.from("outreach").insert({ lead_id: leadId, status });
+    const { error } = await supabase
+      .from("outreach")
+      .insert({ lead_id: leadId, status, ...contactedAtUpdate });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
