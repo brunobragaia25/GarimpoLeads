@@ -277,7 +277,12 @@ export default async function Home({
   const pendingToSend = allLeads.filter(
     (l) => l.email && l.outreach_status === "pending"
   ).length;
-  const contacted = allLeads.filter((l) => l.outreach_status === "contacted").length;
+  const emailContacted = allLeads.filter(
+    (l) => l.email && l.outreach_status === "contacted"
+  ).length;
+  const whatsappContacted = allLeads.filter(
+    (l) => !l.email && l.outreach_status === "contacted"
+  ).length;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -331,7 +336,7 @@ export default async function Home({
         </div>
 
         {/* Stat cards */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
           <StatCard
             icon={Users}
             label="leads no total"
@@ -353,9 +358,15 @@ export default async function Home({
           />
           <StatCard
             icon={CheckCircle2}
-            label="já enviados"
-            value={contacted}
+            label="enviados por email"
+            value={emailContacted}
             accent="bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400"
+          />
+          <StatCard
+            icon={MessageCircle}
+            label="contatados por WhatsApp"
+            value={whatsappContacted}
+            accent="bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-400"
           />
         </div>
 
