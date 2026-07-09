@@ -3,6 +3,7 @@ import {
   isPriorityProspect,
   matchesEmailFilter,
   computeLeadScore,
+  toBrasiliaDateStr,
   type EmailFilter,
 } from "@/lib/leads";
 import { SendOutreachButton } from "./SendOutreachButton";
@@ -209,6 +210,7 @@ export default async function Home({
   const search = (params.search ?? "").trim().toLowerCase();
   const priorityOnly = params.priority === "1";
   const siteFilter = params.site ?? "";
+  const sentDate = params.sentDate ?? "";
   const sortField: SortField = (
     ["score", "name", "category", "performance", "created_at"].includes(
       params.sortField ?? ""
@@ -234,6 +236,12 @@ export default async function Home({
       if (priorityOnly && !isPriorityProspect(lead)) return false;
       if (siteFilter === "with" && !lead.website) return false;
       if (siteFilter === "without" && lead.website) return false;
+      if (
+        sentDate &&
+        toBrasiliaDateStr(lead.contacted_at) !== sentDate &&
+        toBrasiliaDateStr(lead.follow_up_sent_at) !== sentDate
+      )
+        return false;
       return true;
     })
     .sort((a, b) => {
@@ -277,11 +285,13 @@ export default async function Home({
     search,
     priority: priorityOnly ? "1" : undefined,
     site: siteFilter || undefined,
+    sentDate: sentDate || undefined,
     sortField: sortField !== "created_at" ? sortField : undefined,
     sortDir: sortDir !== "desc" ? sortDir : undefined,
   };
 
-  const hasActiveFilters = category || status !== "all" || search || priorityOnly || siteFilter;
+  const hasActiveFilters =
+    category || status !== "all" || search || priorityOnly || siteFilter || sentDate;
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-black">
@@ -393,6 +403,18 @@ export default async function Home({
                 <option value="with">Com site</option>
                 <option value="without">Sem site</option>
               </select>
+            </div>
+
+            <div className="min-w-[150px]">
+              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                Data de envio
+              </label>
+              <input
+                type="date"
+                name="sentDate"
+                defaultValue={sentDate}
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+              />
             </div>
 
             <input type="hidden" name="sortField" value={sortField} />

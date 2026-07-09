@@ -4,6 +4,7 @@ import {
   getLeadsWithDetails,
   isPriorityProspect,
   matchesEmailFilter,
+  toBrasiliaDateStr,
   type EmailFilter,
 } from "@/lib/leads";
 
@@ -26,6 +27,7 @@ export async function GET(req: NextRequest) {
   const search = (params.get("search") ?? "").trim().toLowerCase();
   const priorityOnly = params.get("priority") === "1";
   const siteFilter = params.get("site") ?? "";
+  const sentDate = params.get("sentDate") ?? "";
 
   const allLeads = await getLeadsWithDetails();
 
@@ -36,6 +38,12 @@ export async function GET(req: NextRequest) {
     if (priorityOnly && !isPriorityProspect(lead)) return false;
     if (siteFilter === "with" && !lead.website) return false;
     if (siteFilter === "without" && lead.website) return false;
+    if (
+      sentDate &&
+      toBrasiliaDateStr(lead.contacted_at) !== sentDate &&
+      toBrasiliaDateStr(lead.follow_up_sent_at) !== sentDate
+    )
+      return false;
     return true;
   });
 

@@ -1,5 +1,15 @@
 import { supabase } from "./supabase";
 
+export function toBrasiliaDateStr(iso: string | null): string | null {
+  if (!iso) return null;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
+}
+
 export interface LeadWithDetails {
   id: string;
   name: string;
