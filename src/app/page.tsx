@@ -32,6 +32,7 @@ import {
   Eye,
   MousePointerClick,
   RotateCw,
+  Clock,
   Search,
   ArrowUp,
   ArrowDown,
@@ -43,6 +44,7 @@ type SortField = "created_at" | "score" | "name" | "category" | "performance";
 type SortDir = "asc" | "desc";
 
 const PIPELINE_STATUSES = [
+  "pending",
   "contacted",
   "responded",
   "meeting_scheduled",
@@ -52,6 +54,11 @@ const PIPELINE_STATUSES = [
 ];
 
 const STATUS_BADGES: Record<string, { label: string; icon: LucideIcon; className: string }> = {
+  pending: {
+    label: "Pendente",
+    icon: Clock,
+    className: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
+  },
   contacted: {
     label: "Enviado",
     icon: CheckCircle2,
@@ -534,7 +541,7 @@ export default async function Home({
                 // pelo WhatsApp), então liberamos o pipeline manualmente
                 // pra quem tem um botão de WhatsApp disponível.
                 const showPipeline = hasPipelineStatus || !!wa;
-                const pipelineStatus = hasPipelineStatus ? lead.outreach_status! : "contacted";
+                const pipelineStatus = hasPipelineStatus ? lead.outreach_status! : "pending";
 
                 return (
                   <tr

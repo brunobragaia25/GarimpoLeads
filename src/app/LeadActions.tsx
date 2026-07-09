@@ -112,6 +112,7 @@ export function SendToCRMButton({
 }
 
 const PIPELINE_STAGES = [
+  { value: "pending", label: "Pendente" },
   { value: "contacted", label: "Contatado" },
   { value: "responded", label: "Respondeu" },
   { value: "meeting_scheduled", label: "Reunião marcada" },
