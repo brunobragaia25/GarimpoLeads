@@ -9,7 +9,7 @@ import {
 import { SendOutreachButton } from "./SendOutreachButton";
 import { IgnoreButton, PipelineStageSelect, SendToCRMButton } from "./LeadActions";
 import { PageHeader } from "./PageHeader";
-import { getWhatsappNoSiteTemplate, renderTemplate } from "@/lib/template";
+import { getTemplate, getWhatsappNoSiteTemplate, renderTemplate } from "@/lib/template";
 import {
   Users,
   Flame,
@@ -279,6 +279,21 @@ export default async function Home({
     currentPage * PAGE_SIZE
   );
 
+  // Leads sem email mas com site usam o mesmo template padrão do email
+  // (por categoria) como texto do WhatsApp, em vez do template de "sem site".
+  const categoriesNeedingDefaultTemplate = [
+    ...new Set(
+      pageItems.filter((l) => !l.email && l.website).map((l) => l.category)
+    ),
+  ];
+  const defaultTemplateByCategory = new Map(
+    await Promise.all(
+      categoriesNeedingDefaultTemplate.map(
+        async (c) => [c, await getTemplate(c)] as const
+      )
+    )
+  );
+
   const baseParams = {
     category,
     status,
@@ -500,14 +515,19 @@ export default async function Home({
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900">
               {pageItems.map((lead) => {
                 const score = computeLeadScore(lead);
-                const waText = !lead.website
-                  ? renderTemplate(whatsappTemplate, {
-                      name: lead.name,
-                      category: lead.category,
-                      address: lead.address,
-                    }).body
-                  : undefined;
-                const wa = !lead.website ? whatsappLink(lead.phone, waText) : null;
+                const needsWhatsapp = !lead.email;
+                const templateForWhatsapp = !lead.website
+                  ? whatsappTemplate
+                  : defaultTemplateByCategory.get(lead.category);
+                const waText =
+                  needsWhatsapp && templateForWhatsapp
+                    ? renderTemplate(templateForWhatsapp, {
+                        name: lead.name,
+                        category: lead.category,
+                        address: lead.address,
+                      }).body
+                    : undefined;
+                const wa = needsWhatsapp ? whatsappLink(lead.phone, waText) : null;
 
                 return (
                   <tr
