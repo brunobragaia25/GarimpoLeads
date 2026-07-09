@@ -21,6 +21,8 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   CheckCircle2,
   MessageSquare,
   Calendar,
@@ -138,6 +140,21 @@ function buildQuery(params: Record<string, string | undefined>): string {
   }
   const qs = search.toString();
   return qs ? `?${qs}` : "";
+}
+
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  const delta = 1;
+  const pages: (number | "...")[] = [1];
+
+  const left = Math.max(2, current - delta);
+  const right = Math.min(total - 1, current + delta);
+
+  if (left > 2) pages.push("...");
+  for (let i = left; i <= right; i++) pages.push(i);
+  if (right < total - 1) pages.push("...");
+  if (total > 1) pages.push(total);
+
+  return pages;
 }
 
 function SortableHeader({
@@ -704,7 +721,20 @@ export default async function Home({
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="mt-4 flex items-center justify-center gap-2 text-sm">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 text-sm">
+            <a
+              href={
+                currentPage > 1 ? buildQuery({ ...baseParams, page: "1" }) : "#"
+              }
+              title="Primeira página"
+              className={`inline-flex items-center rounded-lg border border-zinc-300 px-2 py-1.5 dark:border-zinc-700 ${
+                currentPage <= 1
+                  ? "pointer-events-none opacity-40"
+                  : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              }`}
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </a>
             <a
               href={
                 currentPage > 1
@@ -720,9 +750,27 @@ export default async function Home({
               <ChevronLeft className="h-4 w-4" />
               Anterior
             </a>
-            <span className="px-2 text-zinc-500 dark:text-zinc-400">
-              {currentPage} / {totalPages}
-            </span>
+
+            {getPageNumbers(currentPage, totalPages).map((p, i) =>
+              p === "..." ? (
+                <span key={`ellipsis-${i}`} className="px-2 text-zinc-400 dark:text-zinc-600">
+                  …
+                </span>
+              ) : (
+                <a
+                  key={p}
+                  href={buildQuery({ ...baseParams, page: String(p) })}
+                  className={`inline-flex min-w-[36px] items-center justify-center rounded-lg border px-2.5 py-1.5 ${
+                    p === currentPage
+                      ? "border-emerald-600 bg-emerald-600 font-semibold text-white dark:border-emerald-500 dark:bg-emerald-500"
+                      : "border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                  }`}
+                >
+                  {p}
+                </a>
+              )
+            )}
+
             <a
               href={
                 currentPage < totalPages
@@ -737,6 +785,21 @@ export default async function Home({
             >
               Próxima
               <ChevronRight className="h-4 w-4" />
+            </a>
+            <a
+              href={
+                currentPage < totalPages
+                  ? buildQuery({ ...baseParams, page: String(totalPages) })
+                  : "#"
+              }
+              title="Última página"
+              className={`inline-flex items-center rounded-lg border border-zinc-300 px-2 py-1.5 dark:border-zinc-700 ${
+                currentPage >= totalPages
+                  ? "pointer-events-none opacity-40"
+                  : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              }`}
+            >
+              <ChevronsRight className="h-4 w-4" />
             </a>
           </div>
         )}
