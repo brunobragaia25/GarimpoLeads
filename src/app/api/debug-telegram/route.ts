@@ -16,9 +16,12 @@ export async function GET(req: NextRequest) {
 
   const body = await res.text();
 
+  const cronSecret = process.env.CRON_SECRET;
   return NextResponse.json({
     cron_secret_configured: cronSecretConfigured,
     cron_secret_matches: cronSecretMatches,
+    cron_secret_length: cronSecret?.length ?? 0,
+    cron_secret_preview: cronSecret ? `${cronSecret.slice(0, 6)}...${cronSecret.slice(-4)}` : null,
     token_length: token?.length ?? 0,
     token_preview: token ? `${token.slice(0, 6)}...${token.slice(-4)}` : null,
     chat_id: chatId,
