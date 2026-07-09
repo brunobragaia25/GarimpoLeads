@@ -8,6 +8,7 @@ import {
 import { SendOutreachButton } from "./SendOutreachButton";
 import { IgnoreButton, PipelineStageSelect, SendToCRMButton } from "./LeadActions";
 import { PageHeader } from "./PageHeader";
+import { getWhatsappNoSiteTemplate, renderTemplate } from "@/lib/template";
 import {
   Users,
   Flame,
@@ -112,12 +113,13 @@ function formatDate(iso: string | null): string {
   });
 }
 
-function whatsappLink(phone: string | null): string | null {
+function whatsappLink(phone: string | null, prefilledText?: string): string | null {
   if (!phone) return null;
   const digits = phone.replace(/\D/g, "");
   if (digits.length < 10) return null;
   const withCountryCode = digits.startsWith("55") ? digits : `55${digits}`;
-  return `https://wa.me/${withCountryCode}`;
+  const base = `https://wa.me/${withCountryCode}`;
+  return prefilledText ? `${base}?text=${encodeURIComponent(prefilledText)}` : base;
 }
 
 function buildQuery(params: Record<string, string | undefined>): string {
@@ -217,6 +219,7 @@ export default async function Home({
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
   const allLeads = await getLeadsWithDetails();
+  const whatsappTemplate = await getWhatsappNoSiteTemplate();
 
   const categories = [...new Set(allLeads.map((l) => l.category))].sort();
 
@@ -474,7 +477,14 @@ export default async function Home({
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900">
               {pageItems.map((lead) => {
                 const score = computeLeadScore(lead);
-                const wa = !lead.website ? whatsappLink(lead.phone) : null;
+                const waText = !lead.website
+                  ? renderTemplate(whatsappTemplate, {
+                      name: lead.name,
+                      category: lead.category,
+                      address: lead.address,
+                    }).body
+                  : undefined;
+                const wa = !lead.website ? whatsappLink(lead.phone, waText) : null;
 
                 return (
                   <tr

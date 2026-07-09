@@ -5,6 +5,7 @@ import { PageHeader } from "../PageHeader";
 import { MessageSquareText, Save, Check, Info } from "lucide-react";
 
 const FOLLOWUP_CATEGORY = "__followup__";
+const WHATSAPP_NO_SITE_CATEGORY = "__whatsapp_no_site__";
 
 export default function TemplatePage() {
   const [category, setCategory] = useState<string>("");
@@ -32,7 +33,10 @@ export default function TemplatePage() {
               .map((t: { category: string | null }) => t.category)
               .filter(
                 (c: string | null): c is string =>
-                  !!c && !categories.includes(c) && c !== FOLLOWUP_CATEGORY
+                  !!c &&
+                  !categories.includes(c) &&
+                  c !== FOLLOWUP_CATEGORY &&
+                  c !== WHATSAPP_NO_SITE_CATEGORY
               );
             setCustomCategories([...new Set(extra)] as string[]);
           });
@@ -116,28 +120,35 @@ export default function TemplatePage() {
               </option>
             ))}
             <option value={FOLLOWUP_CATEGORY}>Follow-up (acompanhamento automático)</option>
+            <option value={WHATSAPP_NO_SITE_CATEGORY}>WhatsApp (leads sem site)</option>
           </select>
           <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
             {category === FOLLOWUP_CATEGORY
               ? "Enviado automaticamente pra quem foi contatado há 5+ dias e não recebeu follow-up ainda. Se não configurar, usa um texto padrão simples."
-              : 'Se uma categoria não tiver template próprio, usa o "Padrão" na hora de enviar.'}
+              : category === WHATSAPP_NO_SITE_CATEGORY
+                ? "Texto que já vem preenchido ao clicar no botão de WhatsApp de um lead sem site, no dashboard."
+                : 'Se uma categoria não tiver template próprio, usa o "Padrão" na hora de enviar.'}
           </p>
 
           {loading ? (
             <p className="mt-6 text-sm text-zinc-500 dark:text-zinc-400">Carregando...</p>
           ) : (
             <>
-              <label className="mt-5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Assunto
-              </label>
-              <input
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-              />
+              {category !== WHATSAPP_NO_SITE_CATEGORY && (
+                <>
+                  <label className="mt-5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    Assunto
+                  </label>
+                  <input
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                  />
+                </>
+              )}
 
               <label className="mt-4 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Corpo da mensagem
+                {category === WHATSAPP_NO_SITE_CATEGORY ? "Mensagem do WhatsApp" : "Corpo da mensagem"}
               </label>
               <textarea
                 value={body}

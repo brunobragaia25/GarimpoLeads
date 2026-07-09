@@ -32,6 +32,25 @@ export async function getFollowUpTemplate(): Promise<MessageTemplate> {
   return data ?? DEFAULT_FOLLOWUP_TEMPLATE;
 }
 
+// Mensagem que abre pré-preenchida no botão de WhatsApp dos leads sem site
+// (não usa "subject", só o corpo mesmo).
+export const WHATSAPP_NO_SITE_CATEGORY = "__whatsapp_no_site__";
+
+const DEFAULT_WHATSAPP_NO_SITE_TEMPLATE: MessageTemplate = {
+  subject: "",
+  body: "Oi! Tudo bem? Meu nome é Bruno, da DevzDesign 🙂 Vi que a {{empresa}} ainda não tem site, e isso pode estar fazendo vocês perderem clientes que buscam por aí no Google. Posso te mostrar rapidinho como resolveríamos isso, sem compromisso?",
+};
+
+export async function getWhatsappNoSiteTemplate(): Promise<MessageTemplate> {
+  const { data } = await supabase
+    .from("message_templates")
+    .select("subject, body")
+    .eq("category", WHATSAPP_NO_SITE_CATEGORY)
+    .maybeSingle();
+
+  return data ?? DEFAULT_WHATSAPP_NO_SITE_TEMPLATE;
+}
+
 export async function listTemplates(): Promise<StoredTemplate[]> {
   const { data } = await supabase
     .from("message_templates")
