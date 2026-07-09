@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import { getTemplate, getFollowUpTemplate, renderTemplate, type MessageTemplate } from "./template";
 import { sendOutreachEmail } from "./resend";
 import { createUnsubscribeToken } from "./unsubscribe";
+import { startOfTodayBrasiliaISO } from "./timezone";
 
 async function buildTemplateResolver() {
   const cache = new Map<string, MessageTemplate>();
@@ -24,9 +25,7 @@ const DEFAULT_DAILY_LIMIT = 30;
 // Envios iniciais e follow-ups dividem a mesma cota diária, pra proteger a
 // reputação do domínio como um todo (não só o primeiro contato).
 async function countSentToday(): Promise<number> {
-  const startOfDay = new Date();
-  startOfDay.setUTCHours(0, 0, 0, 0);
-  const iso = startOfDay.toISOString();
+  const iso = startOfTodayBrasiliaISO();
 
   const { count: initial } = await supabase
     .from("outreach")
@@ -53,7 +52,7 @@ export async function sendPendingOutreach(limit = 100, leadId?: string) {
 
   const alreadySentToday = await countSentToday();
   const remainingToday = Math.max(0, dailyLimit - alreadySentToday);
-  const effectiveLimit = leadId ? limit : Math.min(limit, remainingToday);
+  const effectiveLimit = Math.min(limit, remainingToday);
 
   if (effectiveLimit === 0) {
     return {

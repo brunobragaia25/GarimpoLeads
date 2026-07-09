@@ -1,14 +1,9 @@
 import { supabase } from "./supabase";
+import { startOfTodayBrasiliaISO } from "./timezone";
 
 function startOfMonthISO(): string {
   const d = new Date();
   d.setUTCDate(1);
-  d.setUTCHours(0, 0, 0, 0);
-  return d.toISOString();
-}
-
-function startOfTodayISO(): string {
-  const d = new Date();
   d.setUTCHours(0, 0, 0, 0);
   return d.toISOString();
 }
@@ -25,7 +20,7 @@ export interface UsageStats {
 
 export async function getUsageStats(): Promise<UsageStats> {
   const monthStart = startOfMonthISO();
-  const todayStart = startOfTodayISO();
+  const todayStart = startOfTodayBrasiliaISO();
 
   const { count: hunterCalls } = await supabase
     .from("outreach")
