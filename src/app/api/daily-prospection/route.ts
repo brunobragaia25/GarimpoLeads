@@ -11,8 +11,9 @@ export const maxDuration = 300;
 const TIME_BUDGET_MS = 260_000;
 
 // Quantas combinações categoria+cidade rodar por dia. A Vercel Pro suporta
-// até 300s de execução, então isso cabe com folga; ajuste se notar timeout.
-const PAIRS_PER_DAY = 6;
+// até 300s de execução; com 6 pares o teste real ficou em 164s, então 10
+// ainda cabe com folga. O loop já para sozinho se o tempo apertar.
+const PAIRS_PER_DAY = 10;
 
 // Raspagem direta do site roda pra todos os leads pendentes (sem limite de
 // cota). Hunter.io só entra como fallback quando a raspagem não acha nada;
