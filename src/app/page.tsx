@@ -528,6 +528,13 @@ export default async function Home({
                       }).body
                     : undefined;
                 const wa = needsWhatsapp ? whatsappLink(lead.phone, waText) : null;
+                const hasPipelineStatus =
+                  !!lead.outreach_status && PIPELINE_STATUSES.includes(lead.outreach_status);
+                // Leads sem email não têm envio automático (é feito na mão
+                // pelo WhatsApp), então liberamos o pipeline manualmente
+                // pra quem tem um botão de WhatsApp disponível.
+                const showPipeline = hasPipelineStatus || !!wa;
+                const pipelineStatus = hasPipelineStatus ? lead.outreach_status! : "contacted";
 
                 return (
                   <tr
@@ -653,13 +660,12 @@ export default async function Home({
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col items-start gap-1.5">
-                        {lead.outreach_status &&
-                          PIPELINE_STATUSES.includes(lead.outreach_status) && (
-                            <PipelineStageSelect
-                              leadId={lead.id}
-                              currentStatus={lead.outreach_status}
-                            />
-                          )}
+                        {showPipeline && (
+                          <PipelineStageSelect
+                            leadId={lead.id}
+                            currentStatus={pipelineStatus}
+                          />
+                        )}
                         {lead.outreach_status !== "ignored" && (
                           <IgnoreButton leadId={lead.id} />
                         )}
