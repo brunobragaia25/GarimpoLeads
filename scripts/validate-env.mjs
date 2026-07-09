@@ -21,8 +21,9 @@ function check(name, { required = true, validate } = {}) {
   }
 
   if (value.startsWith("=")) {
+    const codes = Array.from(value.slice(0, 5)).map((c) => c.charCodeAt(0));
     errors.push(
-      `${name}: começa com "=" — provavelmente colou "NOME=valor" inteiro no campo Value em vez de só o valor`
+      `${name}: começa com "=" (códigos dos 5 primeiros chars: [${codes.join(",")}], tamanho total: ${value.length}) — provavelmente colou "NOME=valor" inteiro no campo Value em vez de só o valor`
     );
     return;
   }

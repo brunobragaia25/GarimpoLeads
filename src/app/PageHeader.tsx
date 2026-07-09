@@ -1,10 +1,11 @@
-import { Flame, LayoutDashboard, Pencil, Gauge, Settings, type LucideIcon } from "lucide-react";
+import { Flame, LayoutDashboard, Pencil, Gauge, Settings, Activity, type LucideIcon } from "lucide-react";
 
 const NAV_ITEMS: { href: string; icon: LucideIcon; label: string }[] = [
   { href: "/", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/template", icon: Pencil, label: "Template" },
   { href: "/usage", icon: Gauge, label: "Uso e cotas" },
   { href: "/settings", icon: Settings, label: "Configurações" },
+  { href: "/status", icon: Activity, label: "Status" },
 ];
 
 export function PageHeader({ active }: { active: string }) {
