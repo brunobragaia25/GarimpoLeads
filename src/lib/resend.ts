@@ -27,8 +27,23 @@ function textToHtml(text: string): string {
   return `<div style="font-family: sans-serif; font-size: 14px; color: #111; white-space: normal;">${withBreaks}</div>`;
 }
 
-export async function sendOutreachEmail(to: string, subject: string, body: string) {
+export async function sendOutreachEmail(
+  to: string,
+  subject: string,
+  body: string,
+  unsubscribeUrl?: string
+) {
   const from = `${process.env.EMAIL_FROM_NAME} <${process.env.EMAIL_FROM_ADDRESS}>`;
+
+  // Cabecalho List-Unsubscribe real (nao so um link no rodape) e o que o
+  // Gmail/Outlook realmente checam pra decidir reputacao e caixa de
+  // entrada vs spam. List-Unsubscribe-Post ativa o botao de 1 clique.
+  const headers = unsubscribeUrl
+    ? {
+        "List-Unsubscribe": `<${unsubscribeUrl}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      }
+    : undefined;
 
   const { error } = await resend.emails.send({
     from,
@@ -36,6 +51,7 @@ export async function sendOutreachEmail(to: string, subject: string, body: strin
     subject,
     text: body,
     html: textToHtml(body),
+    headers,
   });
 
   if (error) throw new Error(error.message);

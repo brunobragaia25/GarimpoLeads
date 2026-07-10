@@ -41,8 +41,11 @@ async function countSentToday(): Promise<number> {
   return (initial ?? 0) + (followUps ?? 0);
 }
 
-function appendUnsubscribeFooter(body: string, leadId: string, token: string): string {
-  const link = `${process.env.APP_URL}/api/unsubscribe?lead=${leadId}&token=${token}`;
+function unsubscribeLink(leadId: string, token: string): string {
+  return `${process.env.APP_URL}/api/unsubscribe?lead=${leadId}&token=${token}`;
+}
+
+function appendUnsubscribeFooter(body: string, link: string): string {
   return `${body}\n\n---\nSe não quiser mais receber esses emails, clique aqui: ${link}`;
 }
 
@@ -94,10 +97,11 @@ export async function sendPendingOutreach(limit = 100, leadId?: string) {
       address: lead.address,
     });
     const token = await createUnsubscribeToken(row.lead_id);
-    const bodyWithFooter = appendUnsubscribeFooter(rendered.body, row.lead_id, token);
+    const link = unsubscribeLink(row.lead_id, token);
+    const bodyWithFooter = appendUnsubscribeFooter(rendered.body, link);
 
     try {
-      await sendOutreachEmail(row.email, rendered.subject, bodyWithFooter);
+      await sendOutreachEmail(row.email, rendered.subject, bodyWithFooter, link);
       await supabase
         .from("outreach")
         .update({ status: "contacted", contacted_at: new Date().toISOString() })
@@ -164,10 +168,11 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20) {
       address: lead.address,
     });
     const token = await createUnsubscribeToken(row.lead_id);
-    const bodyWithFooter = appendUnsubscribeFooter(rendered.body, row.lead_id, token);
+    const link = unsubscribeLink(row.lead_id, token);
+    const bodyWithFooter = appendUnsubscribeFooter(rendered.body, link);
 
     try {
-      await sendOutreachEmail(row.email, rendered.subject, bodyWithFooter);
+      await sendOutreachEmail(row.email, rendered.subject, bodyWithFooter, link);
       await supabase
         .from("outreach")
         .update({ follow_up_sent_at: new Date().toISOString() })

@@ -14,6 +14,13 @@ const BLOCKED_DOMAINS = [
   "wixpress.com",
   "godaddy.com",
   "example.com",
+  "example.com.br",
+  "exemplo.com",
+  "exemplo.com.br",
+  "test.com",
+  "teste.com",
+  "teste.com.br",
+  "email.com",
   "wordpress.com",
   "wordpress.org",
   "schema.org",
@@ -28,21 +35,42 @@ const BLOCKED_DOMAINS = [
   "sentry.wixpress.com",
 ];
 
+// Prefixos de placeholder que sites deixam esquecido no template (nunca
+// sao um contato real). Pegos direto de bounces reais na producao.
+const BLOCKED_LOCAL_PARTS = ["exemplo", "teste", "test", "example", "seuemail", "seunome"];
+
 const BLOCKED_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"];
 
 const CONTACT_PAGE_PATTERN = /href="([^"]*(?:contato|contact|fale-?conosco|sobre)[^"]*)"/i;
+
+// Alguns sites tem mailto: com espaco (as vezes %20) grudado antes do
+// email por erro de template; sem isso o email vira "%20fulano@..." e
+// sempre da bounce.
+function cleanEmail(raw: string): string {
+  let decoded = raw;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    // ignora payload que não é URL-encoding válido
+  }
+  return decoded.trim();
+}
 
 function isUsableEmail(email: string): boolean {
   const lower = email.toLowerCase();
   if (BLOCKED_EXTENSIONS.some((ext) => lower.endsWith(ext))) return false;
   if (BLOCKED_DOMAINS.some((domain) => lower.endsWith(domain))) return false;
   if (lower.startsWith("noreply@") || lower.startsWith("no-reply@")) return false;
+  const localPart = lower.split("@")[0];
+  if (BLOCKED_LOCAL_PARTS.includes(localPart)) return false;
   return true;
 }
 
 function extractEmails(html: string): { mailto: string[]; text: string[] } {
-  const mailto = Array.from(html.matchAll(MAILTO_REGEX)).map((m) => m[1].toLowerCase());
-  const text = Array.from(html.matchAll(EMAIL_REGEX)).map((m) => m[0].toLowerCase());
+  const mailto = Array.from(html.matchAll(MAILTO_REGEX)).map((m) =>
+    cleanEmail(m[1]).toLowerCase()
+  );
+  const text = Array.from(html.matchAll(EMAIL_REGEX)).map((m) => cleanEmail(m[0]).toLowerCase());
   return {
     mailto: [...new Set(mailto)].filter(isUsableEmail),
     text: [...new Set(text)].filter(isUsableEmail),

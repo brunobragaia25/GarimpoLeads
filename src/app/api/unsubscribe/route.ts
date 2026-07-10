@@ -37,3 +37,24 @@ export async function GET(req: NextRequest) {
     { headers: { "Content-Type": "text/html; charset=utf-8" } }
   );
 }
+
+// Gmail/Outlook chamam isso automaticamente (sem UI) quando o usuario clica
+// no botao nativo de "cancelar inscricao" ao lado do remetente, seguindo o
+// header List-Unsubscribe-Post: List-Unsubscribe=One-Click.
+export async function POST(req: NextRequest) {
+  const leadId = req.nextUrl.searchParams.get("lead");
+  const token = req.nextUrl.searchParams.get("token");
+
+  if (!leadId || !token || !(await verifyUnsubscribeToken(leadId, token))) {
+    return new NextResponse(null, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from("outreach")
+    .update({ status: "unsubscribed" })
+    .eq("lead_id", leadId);
+
+  if (error) return new NextResponse(null, { status: 500 });
+
+  return new NextResponse(null, { status: 200 });
+}
