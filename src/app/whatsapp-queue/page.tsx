@@ -11,11 +11,16 @@ export default async function WhatsappQueuePage() {
   const allLeads = await getLeadsWithDetails();
   const whatsappTemplate = await getWhatsappNoSiteTemplate();
 
+  // Fica de fora da fila quem só tem link de rede social (Instagram,
+  // LinkedIn, Facebook, Linktree) no campo "site" - não é um site de
+  // verdade, então não vale gastar tempo manual nesses; quem não tem site
+  // nenhum ou tem site de verdade continua entrando normalmente.
   const pending = allLeads.filter(
     (l) =>
       !l.email &&
       isMobilePhone(l.phone) &&
-      (!l.outreach_status || l.outreach_status === "pending")
+      (!l.outreach_status || l.outreach_status === "pending") &&
+      l.social_platform === null
   );
 
   const categoriesNeedingDefaultTemplate = [

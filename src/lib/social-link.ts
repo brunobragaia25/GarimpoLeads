@@ -3,11 +3,18 @@
 // vez de um site de verdade. Detecta isso só pelo domínio (sem precisar
 // buscar o conteúdo), pra já vir marcado na lista em vez do usuário
 // descobrir clicando um por um.
-export type SocialPlatform = "instagram" | "facebook" | "whatsapp" | "linktree" | "outro link";
+export type SocialPlatform =
+  | "instagram"
+  | "facebook"
+  | "linkedin"
+  | "whatsapp"
+  | "linktree"
+  | "outro link";
 
 const PLATFORM_PATTERNS: Array<{ platform: SocialPlatform; hosts: string[] }> = [
   { platform: "instagram", hosts: ["instagram.com"] },
   { platform: "facebook", hosts: ["facebook.com", "fb.com", "fb.me"] },
+  { platform: "linkedin", hosts: ["linkedin.com"] },
   { platform: "whatsapp", hosts: ["wa.me", "api.whatsapp.com", "whatsapp.com"] },
   { platform: "linktree", hosts: ["linktr.ee"] },
   {
