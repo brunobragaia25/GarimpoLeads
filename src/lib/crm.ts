@@ -14,7 +14,7 @@ function formatPhoneForCRM(phone: string | null): string {
 
 export interface CRMLeadData {
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
 }
 
@@ -27,7 +27,7 @@ export async function sendLeadToCRM(lead: CRMLeadData): Promise<string> {
 
   await docRef.set({
     name: lead.name,
-    email: lead.email,
+    email: lead.email ?? "",
     phone: formatPhoneForCRM(lead.phone),
     serviceType: DEFAULT_SERVICE_TYPE,
   });

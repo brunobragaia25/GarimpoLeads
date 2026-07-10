@@ -39,12 +39,12 @@ export async function POST(
     .not("email", "is", null)
     .maybeSingle();
 
-  if (!outreach?.email) {
-    return NextResponse.json({ error: "Esse lead não tem email encontrado" }, { status: 400 });
-  }
-
   try {
-    const docId = await sendLeadToCRM({ name: lead.name, email: outreach.email, phone: lead.phone });
+    const docId = await sendLeadToCRM({
+      name: lead.name,
+      email: outreach?.email ?? null,
+      phone: lead.phone,
+    });
 
     await supabase
       .from("leads")

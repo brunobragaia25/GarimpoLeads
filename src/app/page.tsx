@@ -15,6 +15,7 @@ import {
   SendToCRMButton,
 } from "./LeadActions";
 import { PageHeader } from "./PageHeader";
+import { FilterForm } from "./FilterForm";
 import { getTemplate, getWhatsappNoSiteTemplate, renderTemplate } from "@/lib/template";
 import { isMobilePhone, whatsappLink } from "@/lib/phone";
 import {
@@ -42,7 +43,6 @@ import {
   MousePointerClick,
   RotateCw,
   Clock,
-  Search,
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
@@ -406,131 +406,16 @@ export default async function Home({
         </div>
 
         {/* Filters */}
-        <form
-          method="GET"
-          className="mt-6 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
-        >
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-[160px] flex-1">
-              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                Categoria
-              </label>
-              <select
-                name="category"
-                defaultValue={category}
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-              >
-                <option value="">Todas</option>
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="min-w-[180px] flex-1">
-              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                Status do email
-              </label>
-              <select
-                name="status"
-                defaultValue={status}
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-              >
-                <option value="all">Todos</option>
-                <option value="no_email">Sem email</option>
-                <option value="not_contacted">Não enviados ainda</option>
-                <option value="pending">Pendente de envio</option>
-                <option value="contacted">Já enviado</option>
-                <option value="ignored">Ignorado</option>
-                <option value="unsubscribed">Descadastrado</option>
-                <option value="bounced">Email inválido (bounce)</option>
-                <option value="responded">Respondeu</option>
-                <option value="meeting_scheduled">Reunião marcada</option>
-                <option value="proposal_sent">Proposta enviada</option>
-                <option value="closed_won">Fechado (ganho)</option>
-                <option value="closed_lost">Fechado (perdido)</option>
-              </select>
-            </div>
-
-            <div className="min-w-[130px]">
-              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                Site
-              </label>
-              <select
-                name="site"
-                defaultValue={siteFilter}
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-              >
-                <option value="">Todos</option>
-                <option value="with">Com site</option>
-                <option value="without">Sem site</option>
-              </select>
-            </div>
-
-            <div className="min-w-[150px]">
-              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                Data de envio
-              </label>
-              <input
-                type="date"
-                name="sentDate"
-                defaultValue={sentDate}
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-              />
-            </div>
-
-            <input type="hidden" name="sortField" value={sortField} />
-            <input type="hidden" name="sortDir" value={sortDir} />
-
-            <div className="min-w-[200px] flex-[2]">
-              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                Buscar por nome
-              </label>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                <input
-                  type="text"
-                  name="search"
-                  defaultValue={search}
-                  placeholder="Nome do lead..."
-                  className="w-full rounded-lg border border-zinc-300 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-zinc-100 pt-3 dark:border-zinc-900">
-            <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-              <input
-                type="checkbox"
-                name="priority"
-                value="1"
-                defaultChecked={priorityOnly}
-                className="h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 dark:border-zinc-700"
-              />
-              Só prioritários
-            </label>
-
-            <button
-              type="submit"
-              className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
-            >
-              <Search className="h-4 w-4" />
-              Filtrar
-            </button>
-            {hasActiveFilters && (
-              <a
-                href="/"
-                className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
-              >
-                <XCircle className="h-4 w-4" />
-                Limpar filtros
-              </a>
-            )}
-          </div>
-        </form>
+        <FilterForm
+          categories={categories}
+          category={category}
+          status={status}
+          siteFilter={siteFilter}
+          sentDate={sentDate}
+          search={search}
+          priorityOnly={priorityOnly}
+          hasActiveFilters={!!hasActiveFilters}
+        />
 
         <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
           {filtered.length} resultado(s) &middot; página {currentPage} de {totalPages}
@@ -731,12 +616,10 @@ export default async function Home({
                             currentStatus={pipelineStatus}
                           />
                         )}
-                        {lead.email && (
-                          <SendToCRMButton
-                            leadId={lead.id}
-                            synced={!!lead.crm_synced_at}
-                          />
-                        )}
+                        <SendToCRMButton
+                          leadId={lead.id}
+                          synced={!!lead.crm_synced_at}
+                        />
                       </div>
                     </td>
                   </tr>
