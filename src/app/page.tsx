@@ -48,7 +48,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-type SortField = "created_at" | "score" | "name" | "category" | "performance";
+type SortField = "created_at" | "score" | "name" | "category" | "performance" | "phone";
 type SortDir = "asc" | "desc";
 
 const PIPELINE_STATUSES = [
@@ -251,7 +251,7 @@ export default async function Home({
   const siteFilter = params.site ?? "";
   const sentDate = params.sentDate ?? "";
   const sortField: SortField = (
-    ["score", "name", "category", "performance", "created_at"].includes(
+    ["score", "name", "category", "performance", "phone", "created_at"].includes(
       params.sortField ?? ""
     )
       ? params.sortField
@@ -294,6 +294,11 @@ export default async function Home({
         case "performance": {
           const aVal = a.performance_score ?? -1;
           const bVal = b.performance_score ?? -1;
+          return (aVal - bVal) * dirMultiplier;
+        }
+        case "phone": {
+          const aVal = isMobilePhone(a.phone) ? 1 : 0;
+          const bVal = isMobilePhone(b.phone) ? 1 : 0;
           return (aVal - bVal) * dirMultiplier;
         }
         default:
@@ -562,7 +567,9 @@ export default async function Home({
                 <th className="whitespace-nowrap px-4 py-3">
                   <SortableHeader field="category" label="Categoria" currentField={sortField} currentDir={sortDir} baseParams={baseParams} />
                 </th>
-                <th className="whitespace-nowrap px-4 py-3">Telefone</th>
+                <th className="whitespace-nowrap px-4 py-3">
+                  <SortableHeader field="phone" label="Telefone" currentField={sortField} currentDir={sortDir} baseParams={baseParams} />
+                </th>
                 <th className="whitespace-nowrap px-4 py-3">Site</th>
                 <th className="whitespace-nowrap px-4 py-3">WordPress</th>
                 <th className="whitespace-nowrap px-4 py-3">
