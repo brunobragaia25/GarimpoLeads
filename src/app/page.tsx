@@ -439,10 +439,6 @@ export default async function Home({
                   <SortableHeader field="phone" label="Telefone" currentField={sortField} currentDir={sortDir} baseParams={baseParams} />
                 </th>
                 <th className="whitespace-nowrap px-4 py-3">Site</th>
-                <th className="whitespace-nowrap px-4 py-3">WordPress</th>
-                <th className="whitespace-nowrap px-4 py-3">
-                  <SortableHeader field="performance" label="Performance" currentField={sortField} currentDir={sortDir} baseParams={baseParams} />
-                </th>
                 <th className="whitespace-nowrap px-4 py-3">Email</th>
                 <th className="whitespace-nowrap px-4 py-3">Status envio</th>
                 <th className="whitespace-nowrap px-4 py-3">Ações</th>
@@ -548,12 +544,6 @@ export default async function Home({
                           sem site
                         </span>
                       )}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                      {lead.is_wordpress === null ? "-" : lead.is_wordpress ? "sim" : "não"}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                      {lead.performance_score ?? "-"}
                     </td>
                     <td className="max-w-[200px] truncate px-4 py-3 text-zinc-600 dark:text-zinc-400">
                       {lead.email ?? "-"}
