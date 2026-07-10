@@ -448,9 +448,10 @@ export default async function Home({
               {pageItems.map((lead) => {
                 const score = computeLeadScore(lead);
                 const needsWhatsapp = !lead.email;
-                const templateForWhatsapp = !lead.website
-                  ? whatsappTemplate
-                  : defaultTemplateByCategory.get(lead.category);
+                const templateForWhatsapp =
+                  !lead.website || lead.social_platform
+                    ? whatsappTemplate
+                    : defaultTemplateByCategory.get(lead.category);
                 const waText =
                   needsWhatsapp && templateForWhatsapp
                     ? renderTemplate(templateForWhatsapp, {
@@ -527,7 +528,18 @@ export default async function Home({
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      {lead.website ? (
+                      {lead.website && lead.social_platform ? (
+                        <a
+                          href={lead.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Não é um site próprio: só um link de rede social"
+                          className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:hover:bg-amber-900"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          {lead.social_platform}
+                        </a>
+                      ) : lead.website ? (
                         <a
                           href={lead.website}
                           target="_blank"

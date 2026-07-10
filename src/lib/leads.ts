@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { detectSocialPlatform, type SocialPlatform } from "./social-link";
 
 export function toBrasiliaDateStr(iso: string | null): string | null {
   if (!iso) return null;
@@ -32,6 +33,7 @@ export interface LeadWithDetails {
   opened_at: string | null;
   clicked_at: string | null;
   crm_synced_at: string | null;
+  social_platform: SocialPlatform | null;
 }
 
 // Teto de segurança pra não puxar uma tabela ilimitada de uma vez; o cron
@@ -73,13 +75,18 @@ export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
       opened_at: outreach?.opened_at ?? null,
       clicked_at: outreach?.clicked_at ?? null,
       crm_synced_at: lead.crm_synced_at ?? null,
+      social_platform: detectSocialPlatform(lead.website),
     };
   });
 }
 
+// Lead cujo "site" é na real só um link de Instagram/Facebook/WhatsApp/
+// Linktree é, na prática, um prospect sem site de verdade - por isso conta
+// como prioritário igual a quem não tem nada preenchido.
 export function isPriorityProspect(lead: LeadWithDetails): boolean {
   return (
     lead.has_website === false ||
+    lead.social_platform !== null ||
     lead.is_wordpress === true ||
     lead.is_slow === true ||
     lead.is_outdated === true
@@ -88,9 +95,12 @@ export function isPriorityProspect(lead: LeadWithDetails): boolean {
 
 // Pontuação heurística de "quão provável é fechar negócio": sem site é o
 // sinal mais forte (nem tem presença online), seguido de site lento/antigo.
+// Link de rede social conta quase como não ter site (ainda precisa de um
+// site de verdade), mas um pouco menos porque já tem alguma presença online.
 export function computeLeadScore(lead: LeadWithDetails): number {
   let score = 0;
   if (lead.has_website === false) score += 100;
+  if (lead.social_platform !== null) score += 80;
   if (lead.is_wordpress) score += 30;
   if (lead.is_slow) score += 30;
   if (lead.is_outdated) score += 20;

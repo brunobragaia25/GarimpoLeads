@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, MessageCircle, SkipForward, ExternalLink, Globe } from "lucide-react";
+import { CheckCircle2, Loader2, MessageCircle, SkipForward, ExternalLink, Globe, Trash2 } from "lucide-react";
 
 export interface QueueLead {
   id: string;
@@ -17,12 +17,14 @@ export interface QueueLead {
 
 export function QueueClient({ leads }: { leads: QueueLead[] }) {
   const router = useRouter();
+  const [queueLeads, setQueueLeads] = useState(leads);
   const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [doneCount, setDoneCount] = useState(0);
 
-  const current = leads[index];
-  const remaining = leads.length - index;
+  const current = queueLeads[index];
+  const remaining = queueLeads.length - index;
 
   async function markContactedAndAdvance() {
     if (!current) return;
@@ -39,6 +41,26 @@ export function QueueClient({ leads }: { leads: QueueLead[] }) {
 
   function skip() {
     setIndex((i) => i + 1);
+  }
+
+  // Remove o lead da fila (e do banco) sem precisar voltar pro dashboard
+  // pra excluir - o próximo item da fila ocupa a mesma posição sozinho,
+  // já que a exclusão tira o item atual da lista em vez de só avançar o
+  // índice.
+  async function handleDelete() {
+    if (!current) return;
+    if (!confirm(`Excluir o lead "${current.name}" permanentemente? Essa ação não pode ser desfeita.`)) {
+      return;
+    }
+    setDeleting(true);
+    const res = await fetch(`/api/leads/${current.id}`, { method: "DELETE" });
+    setDeleting(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? "Erro ao excluir");
+      return;
+    }
+    setQueueLeads((prev) => prev.filter((l) => l.id !== current.id));
   }
 
   if (!current) {
@@ -124,6 +146,15 @@ export function QueueClient({ leads }: { leads: QueueLead[] }) {
           >
             <SkipForward className="h-4 w-4" />
             Pular (não marcar)
+          </button>
+
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            title="Excluir lead"
+            className="inline-flex items-center justify-center rounded-lg p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+          >
+            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
           </button>
         </div>
       </div>
