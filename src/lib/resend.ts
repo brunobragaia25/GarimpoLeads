@@ -21,7 +21,11 @@ function textToHtml(text: string): string {
     const match = url.match(/^(.*?)([).,;:!?\]]*)$/);
     const cleanUrl = match ? match[1] : url;
     const trailing = match ? match[2] : "";
-    return `<a href="${cleanUrl}">${cleanUrl}</a>${trailing}`;
+    // Mostra sem o "https://": o Outlook detecta texto com esse prefixo
+    // dentro do próprio link e tenta linkar de novo por cima, duplicando
+    // visualmente (ex: "[https://site.com]https://site.com").
+    const displayText = cleanUrl.replace(/^https?:\/\//, "");
+    return `<a href="${cleanUrl}">${displayText}</a>${trailing}`;
   });
   const withBreaks = linked.replace(/\n/g, "<br>\n");
   return `<div style="font-family: sans-serif; font-size: 14px; color: #111; white-space: normal;">${withBreaks}</div>`;
