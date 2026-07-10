@@ -115,12 +115,31 @@ export function FilterForm({
           <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
             Data de envio
           </label>
-          <input
-            type="date"
-            defaultValue={sentDate}
-            onChange={(e) => updateParam("sentDate", e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-          />
+          <div className="relative">
+            {/* key={sentDate} força o input a remontar quando a data muda
+                pela URL (ex: botão de limpar, voltar/avançar do navegador);
+                sem isso o valor nativo do <input type="date"> fica preso
+                no que foi digitado e não há como resetar de forma
+                confiável entre navegadores (o "x" nativo do Chrome some
+                depois do primeiro clique e o Safari nem mostra um). */}
+            <input
+              key={sentDate}
+              type="date"
+              defaultValue={sentDate}
+              onChange={(e) => updateParam("sentDate", e.target.value)}
+              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 pr-8 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+            />
+            {sentDate && (
+              <button
+                type="button"
+                onClick={() => updateParam("sentDate", "")}
+                aria-label="Limpar data"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+              >
+                <XCircle className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="min-w-[200px] flex-[2]">
