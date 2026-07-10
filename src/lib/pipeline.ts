@@ -82,6 +82,12 @@ export async function analyzePendingSites(limit = 50) {
   const { data: analyzed } = await supabase.from("site_analysis").select("lead_id");
   const analyzedIds = new Set((analyzed ?? []).map((a) => a.lead_id));
 
+  // Janela bem maior que o total esperado de leads, com o filtro de "ja
+  // analisado" aplicado DEPOIS da busca: se o limite da query fosse
+  // pequeno, os leads mais antigos (todos ja analisados) ocupariam a
+  // janela inteira pra sempre e os novos nunca seriam alcancados - mesma
+  // starvation ja corrigida em findPendingEmails.
+  //
   // Leads sem site sao classificados na hora, sem nenhuma chamada de rede
   // (analyzeSite retorna instantaneo quando `website` e null) - por isso
   // vao primeiro: sao o foco do negocio (prospect direto pra vender site)
@@ -91,11 +97,13 @@ export async function analyzePendingSites(limit = 50) {
     .select("id, website")
     .is("website", null)
     .order("created_at", { ascending: true })
-    .limit(limit);
+    .limit(5000);
 
   if (noWebsiteError) throw new Error(noWebsiteError.message);
 
-  const pendingNoWebsite = (noWebsiteLeads ?? []).filter((l) => !analyzedIds.has(l.id));
+  const pendingNoWebsite = (noWebsiteLeads ?? [])
+    .filter((l) => !analyzedIds.has(l.id))
+    .slice(0, limit);
   const remainingSlots = limit - pendingNoWebsite.length;
 
   let pendingWithWebsite: { id: string; website: string | null }[] = [];
@@ -105,7 +113,7 @@ export async function analyzePendingSites(limit = 50) {
       .select("id, website")
       .not("website", "is", null)
       .order("created_at", { ascending: true })
-      .limit(remainingSlots * 2);
+      .limit(5000);
 
     if (withWebsiteError) throw new Error(withWebsiteError.message);
 

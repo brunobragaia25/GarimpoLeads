@@ -98,3 +98,14 @@ $$;
 create index if not exists idx_site_analysis_lead_id on site_analysis(lead_id);
 create index if not exists idx_outreach_lead_id on outreach(lead_id);
 create index if not exists idx_outreach_status on outreach(status);
+
+-- RLS ligado em tudo, sem nenhuma policy: bloqueia qualquer acesso via
+-- anon key pelo PostgREST público do Supabase. O app só usa a service
+-- role (que ignora RLS), então nada muda pro código.
+alter table leads enable row level security;
+alter table site_analysis enable row level security;
+alter table outreach enable row level security;
+alter table execution_logs enable row level security;
+alter table message_templates enable row level security;
+alter table prospection_config enable row level security;
+alter table login_attempts enable row level security;
