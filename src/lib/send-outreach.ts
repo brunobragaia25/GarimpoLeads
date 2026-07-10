@@ -23,7 +23,10 @@ function sleep(ms: number) {
 const DEFAULT_DAILY_LIMIT = 30;
 
 // Envios iniciais e follow-ups dividem a mesma cota diária, pra proteger a
-// reputação do domínio como um todo (não só o primeiro contato).
+// reputação do domínio como um todo (não só o primeiro contato). Filtra por
+// email presente: leads sem email marcados como "contacted" manualmente
+// (contato feito por WhatsApp, fora deste sistema) não gastam cota nenhuma
+// - so envio de EMAIL de verdade conta pro limite diario.
 async function countSentToday(): Promise<number> {
   const iso = startOfTodayBrasiliaISO();
 
@@ -31,11 +34,13 @@ async function countSentToday(): Promise<number> {
     .from("outreach")
     .select("*", { count: "exact", head: true })
     .eq("status", "contacted")
+    .not("email", "is", null)
     .gte("contacted_at", iso);
 
   const { count: followUps } = await supabase
     .from("outreach")
     .select("*", { count: "exact", head: true })
+    .not("email", "is", null)
     .gte("follow_up_sent_at", iso);
 
   return (initial ?? 0) + (followUps ?? 0);

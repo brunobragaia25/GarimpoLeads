@@ -28,24 +28,31 @@ export async function getUsageStats(): Promise<UsageStats> {
     .ilike("notes", "%hunter_domain_search%")
     .gte("created_at", monthStart);
 
+  // Filtra por email presente: leads sem email marcados como "contacted"
+  // manualmente (contato feito por WhatsApp) nao sao envio de email e nao
+  // devem contar aqui, senao infla esse numero artificialmente.
   const { count: contactedThisMonth } = await supabase
     .from("outreach")
     .select("*", { count: "exact", head: true })
+    .not("email", "is", null)
     .gte("contacted_at", monthStart);
 
   const { count: followUpsThisMonth } = await supabase
     .from("outreach")
     .select("*", { count: "exact", head: true })
+    .not("email", "is", null)
     .gte("follow_up_sent_at", monthStart);
 
   const { count: contactedToday } = await supabase
     .from("outreach")
     .select("*", { count: "exact", head: true })
+    .not("email", "is", null)
     .gte("contacted_at", todayStart);
 
   const { count: followUpsToday } = await supabase
     .from("outreach")
     .select("*", { count: "exact", head: true })
+    .not("email", "is", null)
     .gte("follow_up_sent_at", todayStart);
 
   const { count: totalLeads } = await supabase
