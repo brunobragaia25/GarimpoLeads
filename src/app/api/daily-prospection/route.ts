@@ -10,19 +10,20 @@ export const maxDuration = 300;
 // mesmo que uma etapa individual demore mais que o previsto.
 const TIME_BUDGET_MS = 260_000;
 
-// Quantas combinações categoria+cidade rodar por dia. A Vercel Pro suporta
-// até 300s de execução; com 6 pares o teste real ficou em 164s, então 10
-// ainda cabe com folga. O loop já para sozinho se o tempo apertar.
-const PAIRS_PER_DAY = 10;
+// Quantas combinações categoria+cidade rodar por dia. Reduzido de 10 pra 5:
+// o banco tem um backlog grande de leads que ainda não foram nem
+// analisados nem tiveram email buscado, então vale mais desacelerar a
+// entrada de leads novos e focar o orçamento de tempo em processar quem
+// já está esperando. O loop já para sozinho se o tempo apertar.
+const PAIRS_PER_DAY = 5;
 
-// Raspagem direta do site roda pra todos os leads pendentes (sem limite de
-// cota). Hunter.io só entra como fallback quando a raspagem não acha nada;
-// free tier tem 50 buscas/mês, então 2/dia dá margem de segurança. O limite
-// de escaneamento foi reduzido conforme a base de leads cresceu, pra caber
-// no orçamento de tempo (cada lead custa 1 requisição HTTP).
+// Análise e busca de email agora rodam em paralelo (ver mapWithConcurrency
+// em pipeline.ts), então dá pra processar bem mais por dia dentro do mesmo
+// orçamento de tempo. Hunter.io só entra como fallback quando a raspagem
+// não acha nada; free tier tem 50 buscas/mês, então 2/dia dá margem.
 const HUNTER_FALLBACK_PER_DAY = 2;
-const SCRAPE_LIMIT_PER_DAY = 60;
-const ANALYZE_LIMIT_PER_DAY = 20;
+const SCRAPE_LIMIT_PER_DAY = 150;
+const ANALYZE_LIMIT_PER_DAY = 150;
 
 // Follow-up automático pra quem foi contatado e não respondeu.
 const FOLLOWUP_DAYS_THRESHOLD = 5;
