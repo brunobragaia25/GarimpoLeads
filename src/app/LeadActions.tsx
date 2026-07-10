@@ -2,7 +2,38 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Briefcase, Check, Loader2, Undo2 } from "lucide-react";
+import { Ban, Briefcase, Check, Loader2, Trash2, Undo2 } from "lucide-react";
+
+export function DeleteLeadButton({ leadId, name }: { leadId: string; name: string }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  async function handleDelete() {
+    if (!confirm(`Excluir o lead "${name}" permanentemente? Essa ação não pode ser desfeita.`)) {
+      return;
+    }
+    setLoading(true);
+    const res = await fetch(`/api/leads/${leadId}`, { method: "DELETE" });
+    setLoading(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? "Erro ao excluir");
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <button
+      onClick={handleDelete}
+      disabled={loading}
+      className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-red-600 disabled:opacity-50 dark:hover:text-red-400"
+    >
+      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+      excluir
+    </button>
+  );
+}
 
 export function IgnoreButton({ leadId }: { leadId: string }) {
   const router = useRouter();

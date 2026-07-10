@@ -103,6 +103,7 @@ export function computeLeadScore(lead: LeadWithDetails): number {
 export type EmailFilter =
   | "all"
   | "no_email"
+  | "not_contacted"
   | "pending"
   | "contacted"
   | "ignored"
@@ -117,6 +118,7 @@ export type EmailFilter =
 export function matchesEmailFilter(lead: LeadWithDetails, filter: EmailFilter): boolean {
   if (filter === "all") return true;
   if (filter === "no_email") return !lead.email;
+  if (filter === "not_contacted") return !lead.outreach_status || lead.outreach_status === "pending";
   if (filter === "pending") return !!lead.email && lead.outreach_status === "pending";
   return lead.outreach_status === filter;
 }

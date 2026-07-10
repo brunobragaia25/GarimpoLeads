@@ -7,7 +7,7 @@ import {
   type EmailFilter,
 } from "@/lib/leads";
 import { SendOutreachButton } from "./SendOutreachButton";
-import { IgnoreButton, PipelineStageSelect, SendToCRMButton } from "./LeadActions";
+import { DeleteLeadButton, IgnoreButton, PipelineStageSelect, SendToCRMButton } from "./LeadActions";
 import { PageHeader } from "./PageHeader";
 import { getTemplate, getWhatsappNoSiteTemplate, renderTemplate } from "@/lib/template";
 import {
@@ -122,6 +122,15 @@ function formatDate(iso: string | null): string {
     minute: "2-digit",
     timeZone: "America/Sao_Paulo",
   });
+}
+
+// Celular BR: DDD (2 dígitos) + 9 dígitos começando com "9". Fixo tem só 8
+// dígitos no número local, então não recebe WhatsApp.
+function isMobilePhone(phone: string | null): boolean {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, "");
+  const local = digits.startsWith("55") ? digits.slice(2) : digits;
+  return local.length === 11 && local[2] === "9";
 }
 
 function whatsappLink(phone: string | null, prefilledText?: string): string | null {
@@ -294,6 +303,9 @@ export default async function Home({
   const pendingToSend = allLeads.filter(
     (l) => l.email && l.outreach_status === "pending"
   ).length;
+  const notContacted = allLeads.filter(
+    (l) => !l.outreach_status || l.outreach_status === "pending"
+  ).length;
   const emailContacted = allLeads.filter(
     (l) => l.email && l.outreach_status === "contacted"
   ).length;
@@ -353,7 +365,7 @@ export default async function Home({
         </div>
 
         {/* Stat cards */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
           <StatCard
             icon={Users}
             label="leads no total"
@@ -372,6 +384,13 @@ export default async function Home({
             label="com email encontrado"
             value={withEmail}
             accent="bg-cyan-100 text-cyan-600 dark:bg-cyan-950 dark:text-cyan-400"
+          />
+          <StatCard
+            icon={Clock}
+            label="não enviados ainda"
+            value={notContacted}
+            href={buildQuery({ ...baseParams, status: "not_contacted" })}
+            accent="bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-400"
           />
           <StatCard
             icon={CheckCircle2}
@@ -427,6 +446,7 @@ export default async function Home({
               >
                 <option value="all">Todos</option>
                 <option value="no_email">Sem email</option>
+                <option value="not_contacted">Não enviados ainda</option>
                 <option value="pending">Pendente de envio</option>
                 <option value="contacted">Já enviado</option>
                 <option value="ignored">Ignorado</option>
@@ -562,7 +582,11 @@ export default async function Home({
                         address: lead.address,
                       }).body
                     : undefined;
-                const wa = needsWhatsapp ? whatsappLink(lead.phone, waText) : null;
+                const isLandline = !!lead.phone && !isMobilePhone(lead.phone);
+                const wa =
+                  needsWhatsapp && isMobilePhone(lead.phone)
+                    ? whatsappLink(lead.phone, waText)
+                    : null;
                 const hasPipelineStatus =
                   !!lead.outreach_status && PIPELINE_STATUSES.includes(lead.outreach_status);
                 // Leads sem email não têm envio automático (é feito na mão
@@ -607,6 +631,14 @@ export default async function Home({
                           </span>
                         ) : (
                           "-"
+                        )}
+                        {isLandline && (
+                          <span
+                            title="Telefone fixo: sem WhatsApp"
+                            className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-400"
+                          >
+                            fixo
+                          </span>
                         )}
                         {wa && (
                           <a
@@ -710,6 +742,7 @@ export default async function Home({
                             synced={!!lead.crm_synced_at}
                           />
                         )}
+                        <DeleteLeadButton leadId={lead.id} name={lead.name} />
                       </div>
                     </td>
                   </tr>
