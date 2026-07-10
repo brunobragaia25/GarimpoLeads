@@ -27,10 +27,10 @@ export function DeleteLeadButton({ leadId, name }: { leadId: string; name: strin
     <button
       onClick={handleDelete}
       disabled={loading}
-      className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-red-600 disabled:opacity-50 dark:hover:text-red-400"
+      title="Excluir lead"
+      className="inline-flex items-center justify-center rounded-md p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/40 dark:hover:text-red-400"
     >
-      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-      excluir
+      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
     </button>
   );
 }
@@ -57,10 +57,10 @@ export function IgnoreButton({ leadId }: { leadId: string }) {
     <button
       onClick={handleIgnore}
       disabled={loading}
-      className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-red-600 disabled:opacity-50 dark:hover:text-red-400"
+      title="Ignorar lead"
+      className="inline-flex items-center justify-center rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-red-600 disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-red-400"
     >
-      <Ban className="h-3 w-3" />
-      ignorar
+      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
     </button>
   );
 }

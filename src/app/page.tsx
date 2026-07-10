@@ -727,14 +727,17 @@ export default async function Home({
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col items-start gap-1.5">
+                        <div className="flex items-center gap-0.5">
+                          {lead.outreach_status !== "ignored" && (
+                            <IgnoreButton leadId={lead.id} />
+                          )}
+                          <DeleteLeadButton leadId={lead.id} name={lead.name} />
+                        </div>
                         {showPipeline && (
                           <PipelineStageSelect
                             leadId={lead.id}
                             currentStatus={pipelineStatus}
                           />
-                        )}
-                        {lead.outreach_status !== "ignored" && (
-                          <IgnoreButton leadId={lead.id} />
                         )}
                         {lead.email && (
                           <SendToCRMButton
@@ -742,7 +745,6 @@ export default async function Home({
                             synced={!!lead.crm_synced_at}
                           />
                         )}
-                        <DeleteLeadButton leadId={lead.id} name={lead.name} />
                       </div>
                     </td>
                   </tr>
