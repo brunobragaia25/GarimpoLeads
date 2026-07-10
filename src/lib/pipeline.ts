@@ -139,8 +139,10 @@ export async function analyzePendingSites(limit = 50) {
 
 // Estrategia: tenta raspar o email direto do site primeiro (gratis, sem
 // limite de cota). So recorre ao Hunter.io (cota mensal escassa) quando a
-// raspagem nao acha nada. Leads que falham nos dois metodos ficam sem
-// registro em `outreach`, entao sao retentados automaticamente no proximo dia.
+// raspagem nao acha nada. Leads em que a raspagem falhou e a cota do Hunter
+// ja tinha acabado ficam sem registro em `outreach` e sao retentados no
+// proximo dia; leads em que o Hunter foi consultado e nao achou nada ganham
+// registro com email null, pra nao queimar a cota de novo no mesmo lead.
 export async function findPendingEmails(hunterLimit = 2, scrapeLimit = 100) {
   const { data: existing } = await supabase.from("outreach").select("lead_id");
   const processedIds = new Set((existing ?? []).map((o) => o.lead_id));
@@ -187,16 +189,22 @@ export async function findPendingEmails(hunterLimit = 2, scrapeLimit = 100) {
     if (hunterUsed < hunterLimit) {
       hunterUsed++;
       const hunterResult = await findEmailForWebsite(lead.website!);
+      // Grava a linha MESMO se o Hunter não achou nada (email null): o
+      // lead fica marcado como processado de vez, senão a cota escassa do
+      // Hunter seria queimada de novo no mesmo lead todo dia. Linhas com
+      // email null nunca entram no envio (sendPendingOutreach filtra).
       rows.push({
         lead_id: lead.id,
         email: hunterResult.email,
         email_confidence: hunterResult.confidence,
         status: "pending",
-        notes: "Fonte: hunter_domain_search",
+        notes: hunterResult.email
+          ? "Fonte: hunter_domain_search"
+          : "Fonte: hunter_domain_search (sem resultado)",
       });
     }
     // Se a raspagem falhou e a cota do Hunter acabou, não grava nada:
-    // o lead continua pendente e será retentado no próximo dia.
+    // o lead continua sem registro e será retentado no próximo dia.
   }
 
   if (rows.length > 0) {

@@ -30,10 +30,13 @@ const DEFAULT_DAILY_LIMIT = 30;
 async function countSentToday(): Promise<number> {
   const iso = startOfTodayBrasiliaISO();
 
+  // Conta por contacted_at, SEM filtrar por status: um lead contatado hoje
+  // que já deu bounce/respondeu/descadastrou no mesmo dia gastou cota do
+  // mesmo jeito - filtrar por status "contacted" faria essa cota "voltar"
+  // e o limite diário de reputação seria furado.
   const { count: initial } = await supabase
     .from("outreach")
     .select("*", { count: "exact", head: true })
-    .eq("status", "contacted")
     .not("email", "is", null)
     .gte("contacted_at", iso);
 

@@ -59,6 +59,9 @@ check("EMAIL_FROM_ADDRESS", {
 });
 check("EMAIL_FROM_NAME");
 check("DASHBOARD_PASSWORD");
+check("SESSION_SECRET", {
+  validate: (v) => (v.length < 32 ? "esperado pelo menos 32 caracteres aleatórios" : null),
+});
 check("APP_URL", {
   validate: (v) => (!v.startsWith("http") ? "deveria começar com http:// ou https://" : null),
 });

@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { COOKIE_NAME, createSessionCookieValue, isValidPassword } from "@/lib/auth";
+import {
+  COOKIE_NAME,
+  SESSION_MAX_AGE_SECONDS,
+  createSessionCookieValue,
+  isValidPassword,
+} from "@/lib/auth";
 import { checkLock, recordFailedAttempt, resetAttempts, getClientIp } from "@/lib/login-rate-limit";
 
 export async function POST(req: NextRequest) {
@@ -27,7 +32,7 @@ export async function POST(req: NextRequest) {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: SESSION_MAX_AGE_SECONDS,
     path: "/",
   });
   return response;

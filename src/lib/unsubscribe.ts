@@ -1,3 +1,7 @@
+// Mantém o CRON_SECRET como chave de propósito: trocar a chave aqui
+// invalidaria os links de descadastro de todos os emails JÁ enviados
+// (o token vai embutido na URL do rodapé e no header List-Unsubscribe).
+// A sessão do dashboard usa SESSION_SECRET separado (ver auth.ts).
 async function sign(value: string): Promise<string> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(

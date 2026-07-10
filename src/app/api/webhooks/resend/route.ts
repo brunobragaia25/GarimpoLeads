@@ -12,13 +12,18 @@ interface ResendWebhookPayload {
 }
 
 async function findActiveOutreach(email: string) {
+  // limit(1) em vez de maybeSingle(): dois leads podem compartilhar o
+  // mesmo email genérico (ex: contato@ de rede de franquias), e nesse
+  // caso o maybeSingle() retorna erro, quebrando o rastreio de
+  // abertura/clique silenciosamente.
   const { data } = await supabase
     .from("outreach")
     .select("id, opened_at, clicked_at, leads(name)")
     .eq("email", email)
     .eq("status", "contacted")
-    .maybeSingle();
-  return data;
+    .order("contacted_at", { ascending: false })
+    .limit(1);
+  return data?.[0] ?? null;
 }
 
 export async function POST(req: NextRequest) {
