@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, MessageCircle, SkipForward, ExternalLink } from "lucide-react";
+import { CheckCircle2, MessageCircle, SkipForward, ExternalLink, Globe } from "lucide-react";
 
 export interface QueueLead {
   id: string;
@@ -10,6 +10,7 @@ export interface QueueLead {
   category: string;
   address: string | null;
   phone: string;
+  website: string | null;
   waLink: string;
   message: string;
 }
@@ -78,6 +79,18 @@ export function QueueClient({ leads }: { leads: QueueLead[] }) {
             </p>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{current.phone}</p>
           </div>
+          {current.website && (
+            <a
+              href={current.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            >
+              <Globe className="h-4 w-4" />
+              Ver site
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          )}
         </div>
 
         <div className="mt-4 rounded-lg bg-zinc-50 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">

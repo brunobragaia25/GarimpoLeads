@@ -51,6 +51,7 @@ export default async function WhatsappQueuePage() {
         category: lead.category,
         address: lead.address,
         phone: lead.phone!,
+        website: lead.website,
         waLink,
         message,
       };
