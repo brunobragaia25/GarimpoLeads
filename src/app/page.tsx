@@ -7,7 +7,13 @@ import {
   type EmailFilter,
 } from "@/lib/leads";
 import { SendOutreachButton } from "./SendOutreachButton";
-import { DeleteLeadButton, IgnoreButton, PipelineStageSelect, SendToCRMButton } from "./LeadActions";
+import {
+  DeleteLeadButton,
+  EditablePhone,
+  IgnoreButton,
+  PipelineStageSelect,
+  SendToCRMButton,
+} from "./LeadActions";
 import { PageHeader } from "./PageHeader";
 import { getTemplate, getWhatsappNoSiteTemplate, renderTemplate } from "@/lib/template";
 import {
@@ -624,14 +630,10 @@ export default async function Home({
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
-                        {lead.phone ? (
-                          <span className="inline-flex items-center gap-1">
-                            <Phone className="h-3.5 w-3.5 text-zinc-400" />
-                            {lead.phone}
-                          </span>
-                        ) : (
-                          "-"
-                        )}
+                        <span className="inline-flex items-center gap-1">
+                          <Phone className="h-3.5 w-3.5 text-zinc-400" />
+                          <EditablePhone leadId={lead.id} phone={lead.phone} />
+                        </span>
                         {isLandline && (
                           <span
                             title="Telefone fixo: sem WhatsApp"

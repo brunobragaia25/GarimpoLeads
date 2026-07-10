@@ -7,6 +7,31 @@ async function isAuthorized(req: NextRequest): Promise<boolean> {
   return isValidSessionCookie(session);
 }
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id: leadId } = await params;
+  const { phone } = await req.json().catch(() => ({}));
+
+  if (typeof phone !== "string") {
+    return NextResponse.json({ error: "Telefone inválido" }, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from("leads")
+    .update({ phone: phone.trim() || null })
+    .eq("id", leadId);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true });
+}
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
