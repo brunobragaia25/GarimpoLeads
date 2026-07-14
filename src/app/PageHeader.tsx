@@ -6,12 +6,14 @@ import {
   Settings,
   Activity,
   MessageCircle,
+  Bot,
   type LucideIcon,
 } from "lucide-react";
 
 const NAV_ITEMS: { href: string; icon: LucideIcon; label: string }[] = [
   { href: "/", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/whatsapp-queue", icon: MessageCircle, label: "Fila de WhatsApp" },
+  { href: "/whatsapp-chats", icon: Bot, label: "Chats de WhatsApp" },
   { href: "/template", icon: Pencil, label: "Template" },
   { href: "/usage", icon: Gauge, label: "Uso e cotas" },
   { href: "/settings", icon: Settings, label: "Configurações" },

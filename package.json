@@ -11,6 +11,7 @@
     "check-env": "node scripts/validate-env.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
     "@supabase/supabase-js": "^2.110.1",
     "axios": "^1.18.1",
     "cheerio": "^1.2.0",

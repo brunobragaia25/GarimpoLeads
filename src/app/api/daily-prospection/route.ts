@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { scrapeLeadsForQuery, analyzePendingSites, findPendingEmails } from "@/lib/pipeline";
 import { sendFollowUps } from "@/lib/send-outreach";
+import { sendPendingWhatsappTemplates } from "@/lib/send-whatsapp-outreach";
 import { getPairsForDay } from "@/config/prospection";
 
 export const maxDuration = 300;
@@ -29,6 +30,10 @@ const ANALYZE_LIMIT_PER_DAY = 150;
 const FOLLOWUP_DAYS_THRESHOLD = 5;
 const FOLLOWUP_LIMIT_PER_DAY = 20;
 
+// Disparo de template WhatsApp (Meta) pros leads elegiveis; a IA responde
+// via webhook separado quando o lead responder, fora deste cron.
+const WHATSAPP_TEMPLATES_LIMIT_PER_DAY = 20;
+
 function isAuthorized(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
   return auth === `Bearer ${process.env.CRON_SECRET}`;
@@ -44,6 +49,7 @@ export async function GET(req: NextRequest) {
   let leadsFound = 0;
   let emailsFound = 0;
   let followUpsSent = 0;
+  let whatsappTemplatesSent = 0;
   let pairs: { category: string; location: string }[] = [];
 
   const timeLeft = () => TIME_BUDGET_MS - (Date.now() - startedAt);
@@ -107,6 +113,18 @@ export async function GET(req: NextRequest) {
     } else {
       errors.push("follow-ups: pulado por falta de tempo");
     }
+
+    if (timeLeft() > 10_000) {
+      try {
+        const whatsappResult = await sendPendingWhatsappTemplates(WHATSAPP_TEMPLATES_LIMIT_PER_DAY);
+        whatsappTemplatesSent = whatsappResult.sent;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "erro desconhecido";
+        errors.push(`whatsapp-templates: ${message}`);
+      }
+    } else {
+      errors.push("whatsapp-templates: pulado por falta de tempo");
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";
     errors.push(`erro geral inesperado: ${message}`);
@@ -126,6 +144,7 @@ export async function GET(req: NextRequest) {
     leads_found: leadsFound,
     emails_found: emailsFound,
     follow_ups_sent: followUpsSent,
+    whatsapp_templates_sent: whatsappTemplatesSent,
     errors,
     duration_ms: durationMs,
   });

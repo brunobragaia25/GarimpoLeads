@@ -94,6 +94,20 @@ check("SEND_DAILY_LIMIT", {
   required: false,
   validate: (v) => (Number.isNaN(Number(v)) ? "deveria ser um número" : null),
 });
+check("ANTHROPIC_API_KEY", {
+  required: false,
+  validate: (v) => (!v.startsWith("sk-ant-") ? "chaves da Anthropic começam com 'sk-ant-'" : null),
+});
+check("WHATSAPP_PHONE_NUMBER_ID", { required: false });
+check("WHATSAPP_ACCESS_TOKEN", { required: false });
+check("WHATSAPP_APP_SECRET", { required: false });
+check("WHATSAPP_WEBHOOK_VERIFY_TOKEN", { required: false });
+check("WHATSAPP_TEMPLATE_NO_SITE_NAME", { required: false });
+check("WHATSAPP_TEMPLATE_HAS_SITE_NAME", { required: false });
+check("WHATSAPP_DAILY_LIMIT", {
+  required: false,
+  validate: (v) => (Number.isNaN(Number(v)) ? "deveria ser um número" : null),
+});
 
 if (errors.length > 0) {
   console.error("\n❌ Variáveis de ambiente com problema:\n");

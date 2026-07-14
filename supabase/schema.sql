@@ -85,6 +85,35 @@ create table if not exists login_attempts (
   locked_until timestamptz
 );
 
+-- Conversa de WhatsApp automatizada (template Meta + resposta por IA).
+-- Separado da tabela `outreach` porque ela é orientada a email (email,
+-- email_confidence, opened_at, clicked_at não fazem sentido pro WhatsApp).
+-- `status` controla a janela de atendimento de 24h da Meta: template_sent/
+-- open = janela ativa (pode responder com texto livre grátis), closed =
+-- passou de 24h sem resposta, precisa de novo template pra reabrir.
+create table if not exists whatsapp_conversations (
+  id uuid primary key default uuid_generate_v4(),
+  lead_id uuid not null references leads(id) on delete cascade,
+  phone text not null,
+  template_sent_at timestamptz,
+  last_outbound_at timestamptz,
+  last_inbound_at timestamptz,
+  status text not null default 'template_sent', -- template_sent | open | closed
+  ai_enabled boolean not null default true, -- false depois que o humano manda mensagem manual
+  created_at timestamptz not null default now()
+);
+
+-- Histórico de mensagens de cada conversa, usado tanto como log quanto
+-- como contexto pra Claude API montar a resposta seguinte.
+create table if not exists whatsapp_messages (
+  id uuid primary key default uuid_generate_v4(),
+  conversation_id uuid not null references whatsapp_conversations(id) on delete cascade,
+  direction text not null, -- inbound | outbound
+  body text not null,
+  wa_message_id text,
+  created_at timestamptz not null default now()
+);
+
 -- Expoe o tamanho do banco pro painel /usage (a API de management do
 -- Supabase nao expoe isso de forma self-service com token de acesso).
 create or replace function get_database_size()
@@ -98,6 +127,9 @@ $$;
 create index if not exists idx_site_analysis_lead_id on site_analysis(lead_id);
 create index if not exists idx_outreach_lead_id on outreach(lead_id);
 create index if not exists idx_outreach_status on outreach(status);
+create index if not exists idx_whatsapp_conversations_lead_id on whatsapp_conversations(lead_id);
+create index if not exists idx_whatsapp_conversations_phone on whatsapp_conversations(phone);
+create index if not exists idx_whatsapp_messages_conversation_id on whatsapp_messages(conversation_id);
 
 -- RLS ligado em tudo, sem nenhuma policy: bloqueia qualquer acesso via
 -- anon key pelo PostgREST público do Supabase. O app só usa a service
@@ -109,3 +141,5 @@ alter table execution_logs enable row level security;
 alter table message_templates enable row level security;
 alter table prospection_config enable row level security;
 alter table login_attempts enable row level security;
+alter table whatsapp_conversations enable row level security;
+alter table whatsapp_messages enable row level security;
