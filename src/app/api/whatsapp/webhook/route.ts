@@ -4,6 +4,10 @@ import { verifyWhatsappSignature, verifyWhatsappWebhookChallenge } from "@/lib/w
 import { sendWhatsappText } from "@/lib/whatsapp";
 import { generateWhatsappReply } from "@/lib/whatsapp-ai";
 import { logAiUsage } from "@/lib/ai-usage";
+import { detectNegativeIntent } from "@/lib/negative-intent";
+
+const CLOSING_MESSAGE =
+  "Sem problemas, obrigado pelo retorno! Vou parar de te enviar mensagens por aqui. Se mudar de ideia, é só chamar. 🙂";
 
 // Handshake que a Meta faz uma unica vez ao registrar a URL do webhook no
 // painel do app - so devolve o challenge se o verify token bater.
@@ -60,6 +64,42 @@ async function handleIncomingMessage(from: string, waMessageId: string, body: st
   // fica pausada nessa conversa especifica ate ele reativar - evita a IA
   // responder por cima de uma intervencao manual.
   if (!conversation.ai_enabled) return;
+
+  // Recusa clara detectada por regra simples (sem custo): manda uma resposta
+  // educada fixa, fecha a conversa e marca o lead como perdido no pipeline,
+  // sem gastar tokens de IA numa conversa que ja acabou.
+  if (detectNegativeIntent(body)) {
+    const closedAt = new Date().toISOString();
+    const waId = await sendWhatsappText(from, CLOSING_MESSAGE);
+
+    await supabase.from("whatsapp_messages").insert({
+      conversation_id: conversation.id,
+      direction: "outbound",
+      body: CLOSING_MESSAGE,
+      wa_message_id: waId,
+    });
+    await supabase
+      .from("whatsapp_conversations")
+      .update({ last_outbound_at: closedAt, status: "closed", ai_enabled: false })
+      .eq("id", conversation.id);
+
+    const { data: existingOutreach } = await supabase
+      .from("outreach")
+      .select("id")
+      .eq("lead_id", conversation.lead_id)
+      .maybeSingle();
+    if (existingOutreach) {
+      await supabase
+        .from("outreach")
+        .update({ status: "closed_lost" })
+        .eq("id", existingOutreach.id);
+    } else {
+      await supabase
+        .from("outreach")
+        .insert({ lead_id: conversation.lead_id, status: "closed_lost" });
+    }
+    return;
+  }
 
   const { data: lead } = await supabase
     .from("leads")
