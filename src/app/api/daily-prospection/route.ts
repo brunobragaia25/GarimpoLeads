@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { scrapeLeadsForQuery, analyzePendingSites, findPendingEmails } from "@/lib/pipeline";
 import { sendFollowUps } from "@/lib/send-outreach";
-import { sendPendingWhatsappTemplates } from "@/lib/send-whatsapp-outreach";
+import { sendPendingWhatsappTemplates, sendPendingWhatsappFollowUps } from "@/lib/send-whatsapp-outreach";
 import { getPairsForDay } from "@/config/prospection";
 
 export const maxDuration = 300;
@@ -34,6 +34,10 @@ const FOLLOWUP_LIMIT_PER_DAY = 20;
 // via webhook separado quando o lead responder, fora deste cron.
 const WHATSAPP_TEMPLATES_LIMIT_PER_DAY = 20;
 
+// Follow-up automatico pra quem recebeu o template inicial e nunca respondeu.
+const WHATSAPP_FOLLOWUP_DAYS_THRESHOLD = 5;
+const WHATSAPP_FOLLOWUP_LIMIT_PER_DAY = 20;
+
 function isAuthorized(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
   return auth === `Bearer ${process.env.CRON_SECRET}`;
@@ -50,6 +54,7 @@ export async function GET(req: NextRequest) {
   let emailsFound = 0;
   let followUpsSent = 0;
   let whatsappTemplatesSent = 0;
+  let whatsappFollowUpsSent = 0;
   let pairs: { category: string; location: string }[] = [];
 
   const timeLeft = () => TIME_BUDGET_MS - (Date.now() - startedAt);
@@ -125,6 +130,21 @@ export async function GET(req: NextRequest) {
     } else {
       errors.push("whatsapp-templates: pulado por falta de tempo");
     }
+
+    if (timeLeft() > 10_000) {
+      try {
+        const whatsappFollowUpResult = await sendPendingWhatsappFollowUps(
+          WHATSAPP_FOLLOWUP_DAYS_THRESHOLD,
+          WHATSAPP_FOLLOWUP_LIMIT_PER_DAY
+        );
+        whatsappFollowUpsSent = whatsappFollowUpResult.sent;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "erro desconhecido";
+        errors.push(`whatsapp-followups: ${message}`);
+      }
+    } else {
+      errors.push("whatsapp-followups: pulado por falta de tempo");
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";
     errors.push(`erro geral inesperado: ${message}`);
@@ -145,6 +165,7 @@ export async function GET(req: NextRequest) {
     emails_found: emailsFound,
     follow_ups_sent: followUpsSent,
     whatsapp_templates_sent: whatsappTemplatesSent,
+    whatsapp_followups_sent: whatsappFollowUpsSent,
     errors,
     duration_ms: durationMs,
   });

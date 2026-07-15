@@ -96,6 +96,7 @@ create table if not exists whatsapp_conversations (
   lead_id uuid not null references leads(id) on delete cascade,
   phone text not null,
   template_sent_at timestamptz,
+  followup_sent_at timestamptz, -- follow-up automatico pra quem nunca respondeu ao template inicial
   last_outbound_at timestamptz,
   last_inbound_at timestamptz,
   status text not null default 'template_sent', -- template_sent | open | closed

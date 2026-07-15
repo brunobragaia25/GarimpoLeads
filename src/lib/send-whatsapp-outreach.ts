@@ -14,13 +14,23 @@ interface CandidateLead {
   website: string | null;
 }
 
+// Envio inicial e follow-up dividem a mesma cota diaria (mesmo padrao do
+// email em send-outreach.ts), pra proteger a qualidade/reputacao do numero
+// como um todo, nao so o primeiro contato.
 async function countTemplatesSentToday(): Promise<number> {
   const iso = startOfTodayBrasiliaISO();
-  const { count } = await supabase
+
+  const { count: initial } = await supabase
     .from("whatsapp_conversations")
     .select("*", { count: "exact", head: true })
     .gte("template_sent_at", iso);
-  return count ?? 0;
+
+  const { count: followUps } = await supabase
+    .from("whatsapp_conversations")
+    .select("*", { count: "exact", head: true })
+    .gte("followup_sent_at", iso);
+
+  return (initial ?? 0) + (followUps ?? 0);
 }
 
 // Dispara o template Meta aprovado (categoria "marketing", pago por envio)
@@ -112,4 +122,66 @@ export async function sendPendingWhatsappTemplates(limit = 20) {
     sent_today: alreadySentToday + sent,
     daily_limit: dailyLimit,
   };
+}
+
+// Follow-up pra quem recebeu o template inicial ha X dias e nunca respondeu
+// nada (last_inbound_at continua null) - reabre a janela de 24h com outro
+// template pago, ja que texto livre so funciona depois que o lead responde.
+export async function sendPendingWhatsappFollowUps(daysThreshold = 5, limit = 20) {
+  const dailyLimit = Number(process.env.WHATSAPP_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
+  const alreadySentToday = await countTemplatesSentToday();
+  const remainingToday = Math.max(0, dailyLimit - alreadySentToday);
+  const effectiveLimit = Math.min(limit, remainingToday);
+
+  if (effectiveLimit === 0) {
+    return { sent: 0, failed: 0, total: 0 };
+  }
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - daysThreshold);
+
+  const { data: rows, error } = await supabase
+    .from("whatsapp_conversations")
+    .select("id, phone, lead_id, leads(name)")
+    .is("last_inbound_at", null)
+    .is("followup_sent_at", null)
+    .lte("template_sent_at", cutoff.toISOString())
+    .order("template_sent_at", { ascending: true })
+    .limit(effectiveLimit);
+
+  if (error) throw new Error(error.message);
+
+  const templateName = process.env.WHATSAPP_TEMPLATE_FOLLOWUP_NAME!;
+  let sent = 0;
+  let failed = 0;
+
+  for (const row of rows ?? []) {
+    const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads;
+    if (!lead) continue;
+
+    try {
+      const waMessageId = await sendWhatsappTemplate(row.phone, templateName, [lead.name]);
+      const now = new Date().toISOString();
+
+      await supabase
+        .from("whatsapp_conversations")
+        .update({ followup_sent_at: now, last_outbound_at: now })
+        .eq("id", row.id);
+
+      await supabase.from("whatsapp_messages").insert({
+        conversation_id: row.id,
+        direction: "outbound",
+        body: `[Template "${templateName}" enviado com variáveis: ${lead.name}]`,
+        wa_message_id: waMessageId,
+      });
+
+      sent++;
+    } catch {
+      // Falha no envio - nao marca followup_sent_at, entao e retentado no
+      // proximo dia.
+      failed++;
+    }
+  }
+
+  return { sent, failed, total: (rows ?? []).length };
 }
