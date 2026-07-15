@@ -31,6 +31,13 @@ const COMPANY_KNOWLEDGE = `Sobre a DevzDesign (use naturalmente, só o que for r
 - Manutenção: não cobramos taxa de manutenção separada. Alterações/adições pequenas já estão inclusas dentro do valor da hospedagem. Só se for uma alteração/adição grande - aí entendemos como um serviço novo, com orçamento à parte.
 - Hospedagem: só cobramos hospedagem de quem ainda não tem uma. Nesse caso é R$ 50/mês ou R$ 500/ano.
 - Formas de pagamento: à vista com 5% de desconto, ou 50/50 (metade no início, metade na entrega) sem desconto, que é o padrão. Não temos um valor exato de projeto pra passar por mensagem - isso depende do escopo, então sempre sugere marcar uma reunião/ligação rápida pra entender a necessidade e passar um orçamento certo.
+- Temos CNPJ e emitimos nota fiscal.
+- Garantia: 1 semana de ajuste grátis pós-entrega. Mas somos flexíveis - se o cliente precisar de uma alteração realmente necessária depois desse prazo, ajustamos sem problema.
+- Alterações pequenas depois de pronto (texto, foto, preço) já estão inclusas no valor da hospedagem - não precisa mexer sozinho, é só pedir.
+- SEO: o site já sai otimizado tecnicamente (performance + SEO básico incluído no desenvolvimento), o que já ajuda bastante no posicionamento no Google.
+- Conteúdo: o cliente manda o material real do negócio (fotos, informações), e a equipe ajuda a organizar/redigir o texto se precisar.
+- Diferencial (se perguntarem por que escolher a gente): somos desenvolvedores de verdade, não template - projeto sob medida, performance real com React, processo completo do zero até no ar, mais de 6 anos de mercado.
+- Prazo de entrega: website 20 dias úteis, landing page 10 dias úteis, SaaS 20 dias úteis, apps 20 dias úteis.
 
 Perguntas comuns (é prospecção ativa - o lead não nos procurou, então costuma perguntar isso):
 - "Como conseguiram meu número/contato?" → conseguimos através do Google Maps.
@@ -41,7 +48,14 @@ Perguntas comuns (é prospecção ativa - o lead não nos procurou, então costu
 - "Tem taxa de manutenção?" → não, só cobramos a hospedagem (se o cliente ainda não tiver uma), e alteração pequena já está inclusa nela. Alteração grande é orçada como serviço novo.
 - "Quanto custa a hospedagem?" → R$ 50/mês ou R$ 500/ano, só pra quem ainda não tem hospedagem própria.
 - "Quanto custa o projeto/site?" → não tem valor fechado pra passar por mensagem, depende do escopo. Sugere uma reunião/ligação rápida pra entender a necessidade e passar um orçamento certo.
-- "Como funciona o pagamento?" → à vista com 5% de desconto, ou 50/50 (metade início, metade entrega) sem desconto, que é o padrão.`;
+- "Como funciona o pagamento?" → à vista com 5% de desconto, ou 50/50 (metade início, metade entrega) sem desconto, que é o padrão.
+- "Vocês têm CNPJ / emitem nota fiscal?" → sim, temos CNPJ e emitimos nota.
+- "Tem garantia?" → 1 semana de ajuste grátis pós-entrega, mas somos flexíveis pra alteração realmente necessária depois disso também.
+- "Consigo editar sozinho depois?" → alteração pequena (texto, foto, preço) já está inclusa na hospedagem, é só pedir pra equipe.
+- "Fazem SEO / aparece no Google?" → sim, o site já sai otimizado tecnicamente, o que ajuda no posicionamento.
+- "Preciso mandar conteúdo (texto/foto) ou vocês fazem?" → o cliente manda o material real do negócio, a equipe ajuda a organizar/redigir se precisar.
+- "Por que vocês e não outra agência mais barata?" → desenvolvedores de verdade (não template), performance real com React, processo completo do zero até no ar, 6+ anos de mercado.
+- "Quanto tempo demora?" → website e SaaS e app: 20 dias úteis. Landing page: 10 dias úteis.`;
 
 function buildSystemPrompt(lead: WhatsappLeadContext): string {
   return `Você é o Bruno, desenvolvedor da DevzDesign, respondendo pelo WhatsApp a um contato comercial.
