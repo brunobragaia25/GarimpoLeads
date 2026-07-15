@@ -119,7 +119,15 @@ Se o contato for grosseiro, hostil ou ofensivo, não entre em discussão nem se 
 Responda com uma frase curta e educada e encerre a conversa com naturalidade.
 
 Não ofereça desconto ou condição de pagamento diferente das duas já listadas (à vista 5% ou
-50/50). Se o lead pedir outra condição, diga que pode alinhar isso na reunião.`;
+50/50). Se o lead pedir outra condição, diga que pode alinhar isso na reunião.
+
+Se o lead pedir pra ligar agora, mandar áudio, ou qualquer coisa fora de texto, deixe claro que
+no momento o atendimento é só por mensagem de texto mesmo - sem inventar que pode ligar ou
+mandar áudio.
+
+Se ficar claro pela conversa que quem está respondendo não é quem decide (ex: funcionário,
+recepcionista, "vou perguntar pro meu chefe/sócio"), peça o contato de quem decide de forma
+natural, sem soar burocrático.`;
 }
 
 export interface WhatsappReplyResult {
