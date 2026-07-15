@@ -1,4 +1,14 @@
-import axios from "axios";
+import axios, { isAxiosError } from "axios";
+
+// A mensagem padrao do axios ("Request failed with status code 400") esconde
+// o motivo de verdade que a Meta manda no corpo da resposta de erro - troca
+// pela mensagem real pra facilitar diagnostico.
+function rethrowWithMetaMessage(err: unknown): never {
+  if (isAxiosError(err) && err.response?.data?.error?.message) {
+    throw new Error(`Meta API: ${err.response.data.error.message}`);
+  }
+  throw err;
+}
 
 // v22.0 é a versão estável mais recente da Graph API no momento em que isso
 // foi escrito; a Meta mantém versões antigas funcionando por um bom tempo,
@@ -36,46 +46,54 @@ export async function sendWhatsappTemplate(
   templateName: string,
   variables: string[]
 ): Promise<string> {
-  const { data } = await axios.post(
-    apiUrl(),
-    {
-      messaging_product: "whatsapp",
-      to: toWhatsappPhone(phone),
-      type: "template",
-      template: {
-        name: templateName,
-        language: { code: "pt_BR" },
-        components:
-          variables.length > 0
-            ? [
-                {
-                  type: "body",
-                  parameters: variables.map((text): TemplateVariable => ({ type: "text", text })),
-                },
-              ]
-            : undefined,
+  try {
+    const { data } = await axios.post(
+      apiUrl(),
+      {
+        messaging_product: "whatsapp",
+        to: toWhatsappPhone(phone),
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: "pt_BR" },
+          components:
+            variables.length > 0
+              ? [
+                  {
+                    type: "body",
+                    parameters: variables.map((text): TemplateVariable => ({ type: "text", text })),
+                  },
+                ]
+              : undefined,
+        },
       },
-    },
-    { headers: authHeaders() }
-  );
+      { headers: authHeaders() }
+    );
 
-  return data.messages?.[0]?.id ?? "";
+    return data.messages?.[0]?.id ?? "";
+  } catch (err) {
+    rethrowWithMetaMessage(err);
+  }
 }
 
 // Texto livre - só é aceito pela Meta dentro da janela de atendimento de
 // 24h após o lead ter mandado a última mensagem (categoria "service",
 // grátis). Fora da janela isso falha e precisa reabrir com template.
 export async function sendWhatsappText(phone: string, body: string): Promise<string> {
-  const { data } = await axios.post(
-    apiUrl(),
-    {
-      messaging_product: "whatsapp",
-      to: toWhatsappPhone(phone),
-      type: "text",
-      text: { body },
-    },
-    { headers: authHeaders() }
-  );
+  try {
+    const { data } = await axios.post(
+      apiUrl(),
+      {
+        messaging_product: "whatsapp",
+        to: toWhatsappPhone(phone),
+        type: "text",
+        text: { body },
+      },
+      { headers: authHeaders() }
+    );
 
-  return data.messages?.[0]?.id ?? "";
+    return data.messages?.[0]?.id ?? "";
+  } catch (err) {
+    rethrowWithMetaMessage(err);
+  }
 }
