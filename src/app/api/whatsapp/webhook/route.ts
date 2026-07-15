@@ -5,6 +5,7 @@ import { sendWhatsappText } from "@/lib/whatsapp";
 import { generateWhatsappReply } from "@/lib/whatsapp-ai";
 import { logAiUsage } from "@/lib/ai-usage";
 import { detectNegativeIntent } from "@/lib/negative-intent";
+import { notifyTelegram } from "@/lib/telegram";
 
 const CLOSING_MESSAGE =
   "Sem problemas, obrigado pelo retorno! Vou parar de te enviar mensagens por aqui. Se mudar de ideia, é só chamar. 🙂";
@@ -146,6 +147,16 @@ async function handleIncomingMessage(from: string, waMessageId: string, body: st
       .from("whatsapp_conversations")
       .update({ last_outbound_at: now, status: "open" })
       .eq("id", conversation.id);
+
+    // Handoff: a IA avaliou que essa conversa precisa da atencao do Bruno
+    // agora (reuniao confirmada, pedido de contrato, reclamacao, etc.) -
+    // avisa no Telegram com o link direto pro chat.
+    if (reply.needsHandoff) {
+      const chatUrl = `${process.env.APP_URL}/whatsapp-chats/${conversation.id}`;
+      await notifyTelegram(
+        `Atenção necessária no WhatsApp\n\nLead: ${lead.name}\nMotivo: ${reply.handoffReason}\n\n${chatUrl}`
+      );
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";
     console.error("Erro gerando/enviando resposta da IA:", message);

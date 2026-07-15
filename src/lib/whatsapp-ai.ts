@@ -144,14 +144,41 @@ fica robótico e cansativo de responder.
 
 Se o lead comparar com um concorrente nomeado (Wix, Canva, outra agência, etc.), não ataque o
 concorrente - só reforce o diferencial próprio (código sob medida, feito do zero, vs. template
-pronto).`;
+pronto).
+
+Além da resposta, avalie se essa conversa precisa da atenção do Bruno agora (needs_handoff):
+reunião/ligação confirmada ou combinada, pedido explícito de fechar negócio ou receber contrato,
+reclamação séria, ou pedido explícito de falar direto com o Bruno. Não marque como handoff só
+por uma pergunta comum de dúvida - é só pra quando realmente precisa de uma pessoa agindo.`;
 }
 
 export interface WhatsappReplyResult {
   text: string;
+  needsHandoff: boolean;
+  handoffReason: string;
   inputTokens: number;
   outputTokens: number;
 }
+
+const RESPONSE_SCHEMA = {
+  type: "object" as const,
+  properties: {
+    reply: {
+      type: "string",
+      description: "A mensagem de resposta pro lead, no tom natural de WhatsApp definido no prompt.",
+    },
+    needs_handoff: {
+      type: "boolean",
+      description: "true se essa conversa precisa da atenção do Bruno agora (reunião confirmada, pedido de contrato, reclamação séria, pedido explícito de falar com ele).",
+    },
+    handoff_reason: {
+      type: "string",
+      description: "Motivo curto do handoff em uma frase, vazio se needs_handoff for false.",
+    },
+  },
+  required: ["reply", "needs_handoff", "handoff_reason"],
+  additionalProperties: false,
+};
 
 export async function generateWhatsappReply(
   lead: WhatsappLeadContext,
@@ -169,11 +196,23 @@ export async function generateWhatsappReply(
     max_tokens: 300,
     system: buildSystemPrompt(lead),
     messages,
+    output_config: {
+      format: { type: "json_schema", schema: RESPONSE_SCHEMA },
+    },
   });
 
   const textBlock = response.content.find((b) => b.type === "text");
+  let parsed = { reply: "", needs_handoff: false, handoff_reason: "" };
+  try {
+    parsed = JSON.parse(textBlock?.text ?? "{}");
+  } catch {
+    parsed.reply = textBlock?.text ?? "";
+  }
+
   return {
-    text: textBlock?.text ?? "",
+    text: parsed.reply,
+    needsHandoff: !!parsed.needs_handoff,
+    handoffReason: parsed.handoff_reason ?? "",
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
   };
