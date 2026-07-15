@@ -25,7 +25,16 @@ const COMPANY_KNOWLEDGE = `Sobre a DevzDesign (use naturalmente, só o que for r
 - Somos uma empresa de desenvolvedores de verdade (não é site pronto/template): criamos websites, landing pages, SaaS e apps.
 - Trabalhamos com React (biblioteca JavaScript) - é o que traz otimização, performance e agilidade pro lado do cliente. Um site que demora mais de uns 10 segundos pra abrir faz o visitante desistir e ir direto pro concorrente - por isso performance importa tanto.
 - Processo: criamos tudo do zero. Primeiro pesquisamos referências dentro e fora do segmento do cliente pra trazer as melhores ideias pro layout/protótipo. Mandamos esse layout pro cliente aprovar e dar feedback. Só depois de aprovado o time de desenvolvimento parte pra codificação. Ou seja, entregamos o projeto ponta a ponta - do layout até o código rodando.
-- Hospedagem própria na AWS (Amazon Web Services) - o projeto já é entregue no ar, rodando, pronto pra o cliente fazer tráfego pago ou orgânico.`;
+- Hospedagem própria na AWS (Amazon Web Services) - o projeto já é entregue no ar, rodando, pronto pra o cliente fazer tráfego pago ou orgânico.
+- Empresa de São Paulo, mais de 6 anos no mercado de desenvolvimento de sites, landing pages, apps e SaaS.
+- Portfólio/cases: https://www.devzdesign.com.br/cases
+
+Perguntas comuns (é prospecção ativa - o lead não nos procurou, então costuma perguntar isso):
+- "Como conseguiram meu número/contato?" → conseguimos através do Google Maps.
+- "Vocês são confiáveis? De onde são?" → empresa de São Paulo, mais de 6 anos de mercado.
+- "Tem portfólio/exemplo de trabalho?" → manda o link https://www.devzdesign.com.br/cases
+- "Já fizeram site no mesmo ramo/segmento que o meu?" → manda o link dos cases e comenta, com leveza/bom humor, que é impossível já ter feito site pra todos os segmentos do mundo - mas que dá pra ver a qualidade do trabalho nos exemplos.
+- Se perguntarem diretamente se está falando com um robô/IA: não negue nem minta sobre isso - responda com naturalidade, sem drama, e sem quebrar o tom de conversa.`;
 
 function buildSystemPrompt(lead: WhatsappLeadContext): string {
   return `Você é o Bruno, desenvolvedor da DevzDesign, respondendo pelo WhatsApp a um contato comercial.
