@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Bot, BotOff, Loader2, Send } from "lucide-react";
 import type { WhatsappConversationDetail } from "@/lib/whatsapp-chats";
@@ -21,6 +21,21 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
   const [sending, setSending] = useState(false);
   const [togglingAi, setTogglingAi] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Busca mensagem nova a cada poucos segundos, sem precisar recarregar a
+  // pagina na mao - o router.refresh() so busca de novo o server component,
+  // preserva o estado local (texto digitado, etc).
+  useEffect(() => {
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [router]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [conversation.messages.length]);
 
   async function handleSend() {
     if (!message.trim()) return;
@@ -124,6 +139,7 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
             </div>
           </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
 
       <div className="border-t border-zinc-100 p-3 dark:border-zinc-900">
