@@ -115,32 +115,47 @@ async function handleIncomingMessage(from: string, waMessageId: string, body: st
     .order("created_at", { ascending: true })
     .limit(20);
 
-  const reply = await generateWhatsappReply(
-    {
-      name: lead.name,
-      category: lead.category,
-      address: lead.address,
-      hasWebsite: !!lead.website,
-    },
-    (history ?? []).map((m) => ({ direction: m.direction as "inbound" | "outbound", body: m.body })),
-    body
-  );
+  // Try/catch proprio aqui (em vez de deixar so o catch generico do POST)
+  // pra gravar o erro como mensagem visivel no chat - sem isso, uma falha
+  // na IA ou no envio so aparece nos logs da Vercel, sem jeito facil de
+  // diagnosticar via dashboard/API.
+  try {
+    const reply = await generateWhatsappReply(
+      {
+        name: lead.name,
+        category: lead.category,
+        address: lead.address,
+        hasWebsite: !!lead.website,
+      },
+      (history ?? []).map((m) => ({ direction: m.direction as "inbound" | "outbound", body: m.body })),
+      body
+    );
 
-  await logAiUsage(reply.inputTokens, reply.outputTokens);
+    await logAiUsage(reply.inputTokens, reply.outputTokens);
 
-  const replyWaId = await sendWhatsappText(from, reply.text);
+    const replyWaId = await sendWhatsappText(from, reply.text);
 
-  const now = new Date().toISOString();
-  await supabase.from("whatsapp_messages").insert({
-    conversation_id: conversation.id,
-    direction: "outbound",
-    body: reply.text,
-    wa_message_id: replyWaId,
-  });
-  await supabase
-    .from("whatsapp_conversations")
-    .update({ last_outbound_at: now, status: "open" })
-    .eq("id", conversation.id);
+    const now = new Date().toISOString();
+    await supabase.from("whatsapp_messages").insert({
+      conversation_id: conversation.id,
+      direction: "outbound",
+      body: reply.text,
+      wa_message_id: replyWaId,
+    });
+    await supabase
+      .from("whatsapp_conversations")
+      .update({ last_outbound_at: now, status: "open" })
+      .eq("id", conversation.id);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "erro desconhecido";
+    console.error("Erro gerando/enviando resposta da IA:", message);
+    await supabase.from("whatsapp_messages").insert({
+      conversation_id: conversation.id,
+      direction: "outbound",
+      body: `[ERRO - não enviado ao lead] ${message}`,
+      wa_message_id: null,
+    });
+  }
 }
 
 export async function POST(req: NextRequest) {
