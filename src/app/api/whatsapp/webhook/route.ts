@@ -28,6 +28,7 @@ interface WhatsappWebhookPayload {
   entry?: Array<{
     changes?: Array<{
       value?: {
+        contacts?: Array<{ wa_id: string; profile?: { name?: string } }>;
         messages?: Array<{
           from: string;
           id: string;
@@ -39,27 +40,90 @@ interface WhatsappWebhookPayload {
   }>;
 }
 
-async function handleIncomingMessage(from: string, waMessageId: string, body: string) {
-  const { data: conversation } = await supabase
+// Lead que responde ao template da prospecção fria já tem linha em `leads`
+// (veio da raspagem do Google Maps). Mensagem espontânea de um número sem
+// conversa registrada é outro caso: lead quente que iniciou contato sozinho
+// (botão de WhatsApp do site, anúncio) - cria lead e conversa na hora em vez
+// de ignorar, como o sistema fazia antes.
+async function findOrCreateConversation(
+  from: string,
+  waMessageId: string,
+  body: string,
+  profileName?: string
+): Promise<{ id: string; lead_id: string; ai_enabled: boolean } | null> {
+  const { data: existing } = await supabase
     .from("whatsapp_conversations")
     .select("id, lead_id, ai_enabled")
     .eq("phone", from)
     .maybeSingle();
 
-  // Mensagem de um numero sem conversa registrada (ninguem mandou template
-  // pra esse contato pelo sistema) - fora do escopo do auto-reply, ignora.
-  if (!conversation) return;
+  if (existing) {
+    await supabase.from("whatsapp_messages").insert({
+      conversation_id: existing.id,
+      direction: "inbound",
+      body,
+      wa_message_id: waMessageId,
+    });
+    await supabase
+      .from("whatsapp_conversations")
+      .update({ last_inbound_at: new Date().toISOString() })
+      .eq("id", existing.id);
+    return existing;
+  }
+
+  const { data: newLead, error: leadError } = await supabase
+    .from("leads")
+    .insert({
+      name: profileName || "Lead via WhatsApp",
+      category: "Contato via site/Ads",
+      phone: from,
+      source: "inbound_whatsapp",
+    })
+    .select("id")
+    .single();
+  if (leadError || !newLead) {
+    console.error("Erro criando lead inbound:", leadError?.message);
+    return null;
+  }
+
+  const { data: newConversation, error: convError } = await supabase
+    .from("whatsapp_conversations")
+    .insert({
+      lead_id: newLead.id,
+      phone: from,
+      status: "open",
+      ai_enabled: true,
+      last_inbound_at: new Date().toISOString(),
+    })
+    .select("id, lead_id, ai_enabled")
+    .single();
+  if (convError || !newConversation) {
+    console.error("Erro criando conversa inbound:", convError?.message);
+    return null;
+  }
 
   await supabase.from("whatsapp_messages").insert({
-    conversation_id: conversation.id,
+    conversation_id: newConversation.id,
     direction: "inbound",
     body,
     wa_message_id: waMessageId,
   });
-  await supabase
-    .from("whatsapp_conversations")
-    .update({ last_inbound_at: new Date().toISOString() })
-    .eq("id", conversation.id);
+
+  // Lead quente (site/Ads) tem prioridade maior que um frio - avisa na
+  // hora, mesmo antes de saber se a IA vai marcar handoff na resposta.
+  const chatUrl = `${process.env.APP_URL}/whatsapp-chats/${newConversation.id}`;
+  await notifyTelegram(
+    `Lead quente no WhatsApp (via site/Ads)\n\nNome: ${profileName || "não informado"}\nTelefone: ${from}\n\n${chatUrl}`
+  );
+
+  return newConversation;
+}
+
+async function handleIncomingMessage(from: string, waMessageId: string, body: string, profileName?: string) {
+  const conversation = await findOrCreateConversation(from, waMessageId, body, profileName);
+
+  // Falha ao criar lead/conversa - já logado dentro de findOrCreateConversation.
+  if (!conversation) return;
 
   // Depois que o humano manda uma mensagem manual pela tela de chat, a IA
   // fica pausada nessa conversa especifica ate ele reativar - evita a IA
@@ -104,7 +168,7 @@ async function handleIncomingMessage(from: string, waMessageId: string, body: st
 
   const { data: lead } = await supabase
     .from("leads")
-    .select("name, category, address, website")
+    .select("name, category, address, website, source")
     .eq("id", conversation.lead_id)
     .single();
   if (!lead) return;
@@ -127,6 +191,7 @@ async function handleIncomingMessage(from: string, waMessageId: string, body: st
         category: lead.category,
         address: lead.address,
         hasWebsite: !!lead.website,
+        isInbound: lead.source === "inbound_whatsapp",
       },
       (history ?? []).map((m) => ({ direction: m.direction as "inbound" | "outbound", body: m.body })),
       body
@@ -184,10 +249,12 @@ export async function POST(req: NextRequest) {
   // (imagem, audio, status de entrega/leitura, etc.) por enquanto.
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
+      const contacts = change.value?.contacts ?? [];
       for (const message of change.value?.messages ?? []) {
         if (message.type === "text" && message.text?.body) {
+          const profileName = contacts.find((c) => c.wa_id === message.from)?.profile?.name;
           try {
-            await handleIncomingMessage(message.from, message.id, message.text.body);
+            await handleIncomingMessage(message.from, message.id, message.text.body, profileName);
           } catch (err) {
             console.error("Erro processando mensagem do WhatsApp:", err);
           }
