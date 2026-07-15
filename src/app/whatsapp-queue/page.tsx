@@ -1,6 +1,6 @@
 import { getLeadsWithDetails } from "@/lib/leads";
 import { getTemplate, getWhatsappNoSiteTemplate, renderTemplate } from "@/lib/template";
-import { isMobilePhone, whatsappLink } from "@/lib/phone";
+import { hasUsablePhone, whatsappLink } from "@/lib/phone";
 import { PageHeader } from "../PageHeader";
 import { QueueClient, type QueueLead } from "./QueueClient";
 import { MessageCircle } from "lucide-react";
@@ -18,7 +18,7 @@ export default async function WhatsappQueuePage() {
   const pending = allLeads.filter(
     (l) =>
       !l.email &&
-      isMobilePhone(l.phone) &&
+      hasUsablePhone(l.phone) &&
       (!l.outreach_status || l.outreach_status === "pending") &&
       l.social_platform === null
   );

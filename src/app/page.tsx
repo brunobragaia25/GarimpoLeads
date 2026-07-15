@@ -17,7 +17,7 @@ import {
 import { PageHeader } from "./PageHeader";
 import { FilterForm } from "./FilterForm";
 import { getTemplate, getWhatsappNoSiteTemplate, renderTemplate } from "@/lib/template";
-import { isMobilePhone, whatsappLink } from "@/lib/phone";
+import { hasUsablePhone, isMobilePhone, whatsappLink } from "@/lib/phone";
 import {
   Users,
   Flame,
@@ -462,7 +462,7 @@ export default async function Home({
                     : undefined;
                 const isLandline = !!lead.phone && !isMobilePhone(lead.phone);
                 const wa =
-                  needsWhatsapp && isMobilePhone(lead.phone)
+                  needsWhatsapp && hasUsablePhone(lead.phone)
                     ? whatsappLink(lead.phone, waText)
                     : null;
                 const hasPipelineStatus =
@@ -508,10 +508,10 @@ export default async function Home({
                         </span>
                         {isLandline && (
                           <span
-                            title="Telefone fixo: sem WhatsApp"
-                            className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-400"
+                            title="Formato de telefone fixo - pode ou não ter WhatsApp (comum em linhas VoIP/PABX de empresa)"
+                            className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-400"
                           >
-                            fixo
+                            fixo?
                           </span>
                         )}
                         {wa && (

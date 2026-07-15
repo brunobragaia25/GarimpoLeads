@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { sendWhatsappTemplate, toWhatsappPhone } from "./whatsapp";
-import { isMobilePhone } from "./phone";
+import { hasUsablePhone } from "./phone";
 import { detectSocialPlatform } from "./social-link";
 import { startOfTodayBrasiliaISO } from "./timezone";
 
@@ -56,7 +56,7 @@ export async function sendPendingWhatsappTemplates(limit = 20) {
 
   const pending = (leads ?? [])
     .filter((l): l is CandidateLead => !existingLeadIds.has(l.id))
-    .filter((l) => isMobilePhone(l.phone))
+    .filter((l) => hasUsablePhone(l.phone))
     .filter((l) => detectSocialPlatform(l.website) === null)
     .slice(0, effectiveLimit);
 
