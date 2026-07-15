@@ -1,8 +1,34 @@
 import { supabase } from "./supabase";
-import { getTemplate, getFollowUpTemplate, renderTemplate, type MessageTemplate } from "./template";
+import {
+  getTemplate,
+  getFollowUpTemplate,
+  renderTemplate,
+  buildProblemSummary,
+  type MessageTemplate,
+  type SiteAnalysisSummary,
+} from "./template";
 import { sendOutreachEmail } from "./resend";
 import { createUnsubscribeToken } from "./unsubscribe";
 import { startOfTodayBrasiliaISO } from "./timezone";
+
+// Busca a análise mais recente de cada lead (pode ter mais de uma linha ao
+// longo do tempo) e devolve um Map lead_id -> achados, pra montar o
+// {{problema}} do email com algo real em vez de texto genérico.
+async function fetchLatestAnalysisByLead(leadIds: string[]): Promise<Map<string, SiteAnalysisSummary>> {
+  const map = new Map<string, SiteAnalysisSummary>();
+  if (leadIds.length === 0) return map;
+
+  const { data: analyses } = await supabase
+    .from("site_analysis")
+    .select("lead_id, performance_score, is_slow, is_outdated, is_wordpress, analyzed_at")
+    .in("lead_id", leadIds)
+    .order("analyzed_at", { ascending: false });
+
+  for (const a of analyses ?? []) {
+    if (!map.has(a.lead_id)) map.set(a.lead_id, a);
+  }
+  return map;
+}
 
 async function buildTemplateResolver() {
   const cache = new Map<string, MessageTemplate>();
@@ -91,6 +117,8 @@ export async function sendPendingOutreach(limit = 100, leadId?: string) {
 
   if (error) throw new Error(error.message);
 
+  const analysisByLead = await fetchLatestAnalysisByLead((rows ?? []).map((r) => r.lead_id));
+
   let sent = 0;
   let failed = 0;
 
@@ -103,6 +131,7 @@ export async function sendPendingOutreach(limit = 100, leadId?: string) {
       name: lead.name,
       category: lead.category,
       address: lead.address,
+      problem: buildProblemSummary(analysisByLead.get(row.lead_id) ?? null),
     });
     const token = await createUnsubscribeToken(row.lead_id);
     const link = unsubscribeLink(row.lead_id, token);
@@ -163,6 +192,7 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20) {
   if (error) throw new Error(error.message);
 
   const template = await getFollowUpTemplate();
+  const analysisByLead = await fetchLatestAnalysisByLead((rows ?? []).map((r) => r.lead_id));
   let sent = 0;
   let failed = 0;
 
@@ -174,6 +204,7 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20) {
       name: lead.name,
       category: lead.category,
       address: lead.address,
+      problem: buildProblemSummary(analysisByLead.get(row.lead_id) ?? null),
     });
     const token = await createUnsubscribeToken(row.lead_id);
     const link = unsubscribeLink(row.lead_id, token);

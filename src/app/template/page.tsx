@@ -100,7 +100,9 @@ export default function TemplatePage() {
           <span>
             Variáveis disponíveis: <code className="rounded bg-blue-100 px-1 py-0.5 dark:bg-blue-900">{"{{empresa}}"}</code>,{" "}
             <code className="rounded bg-blue-100 px-1 py-0.5 dark:bg-blue-900">{"{{categoria}}"}</code>,{" "}
-            <code className="rounded bg-blue-100 px-1 py-0.5 dark:bg-blue-900">{"{{cidade}}"}</code>
+            <code className="rounded bg-blue-100 px-1 py-0.5 dark:bg-blue-900">{"{{cidade}}"}</code>,{" "}
+            <code className="rounded bg-blue-100 px-1 py-0.5 dark:bg-blue-900">{"{{problema}}"}</code>{" "}
+            <span className="text-blue-700 dark:text-blue-400">(achado real da análise do site, ex: &quot;o carregamento tá bem lento&quot;)</span>
           </span>
         </div>
 

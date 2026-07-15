@@ -11,8 +11,8 @@ export interface StoredTemplate extends MessageTemplate {
 }
 
 const DEFAULT_TEMPLATE: MessageTemplate = {
-  subject: "Contato - {{empresa}}",
-  body: "Olá, tudo bem?\n\nMeu nome é Bruno, sou desenvolvedor e notei o site da {{empresa}} em {{cidade}}...\n\nAbraço.",
+  subject: "Sobre o site da {{empresa}}",
+  body: "Oi, tudo bem?\n\nSou o Bruno, da DevzDesign (devzdesign.com.br) - trabalho com modernização de sites.\n\nDei uma olhada no site da {{empresa}} e reparei que {{problema}}. Isso pode estar afastando quem pesquisa por {{categoria}} em {{cidade}} e acaba indo pro concorrente.\n\nSe fizer sentido, posso te mostrar rapidinho o que notei, sem compromisso.\n\nAbraço,\nBruno Bragaia\nDevzDesign",
 };
 
 export const FOLLOWUP_CATEGORY = "__followup__";
@@ -112,10 +112,42 @@ function extractCity(address: string | null): string {
   return match ? match[1].trim() : "";
 }
 
+export interface SiteAnalysisSummary {
+  performance_score: number | null;
+  is_slow: boolean | null;
+  is_outdated: boolean | null;
+  is_wordpress: boolean | null;
+}
+
+// Converte os achados reais da análise do site (site_analysis) numa frase
+// natural em português, pra email deixar de soar genérico ("coisas como
+// velocidade, visual...") e citar algo específico e verdadeiro sobre o
+// site do lead. Sem análise ou sem nenhum problema detectado, cai pra uma
+// frase neutra em vez de deixar {{problema}} vazio no meio do texto.
+export function buildProblemSummary(analysis: SiteAnalysisSummary | null): string {
+  if (!analysis) return "tem alguns pontos que dava pra melhorar";
+
+  const parts: string[] = [];
+  if (analysis.is_slow || (analysis.performance_score !== null && analysis.performance_score < 50)) {
+    parts.push("o carregamento tá bem lento");
+  }
+  if (analysis.is_outdated) {
+    parts.push("o visual parece desatualizado");
+  }
+  if (analysis.is_wordpress) {
+    parts.push("é feito em WordPress, o que costuma deixar mais lento e mais vulnerável que um site sob medida");
+  }
+
+  if (parts.length === 0) return "tem alguns pontos que dava pra melhorar";
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(", ")} e ${parts[parts.length - 1]}`;
+}
+
 export interface TemplateLeadData {
   name: string;
   category: string;
   address: string | null;
+  problem?: string;
 }
 
 export function renderTemplate(template: MessageTemplate, lead: TemplateLeadData): MessageTemplate {
@@ -123,6 +155,7 @@ export function renderTemplate(template: MessageTemplate, lead: TemplateLeadData
     empresa: lead.name,
     categoria: lead.category,
     cidade: extractCity(lead.address),
+    problema: lead.problem ?? "tem alguns pontos que dava pra melhorar",
   };
 
   function render(text: string): string {
