@@ -1,7 +1,12 @@
 import { getUsageStats } from "@/lib/usage";
 import { getWeeklyTrends } from "@/lib/trends";
 import { PageHeader } from "../PageHeader";
-import { Gauge, TrendingUp, Mail, Users, MailCheck } from "lucide-react";
+import { Gauge, TrendingUp, Mail, Users, MailCheck, Bot } from "lucide-react";
+
+function formatUsd(value: number): string {
+  if (value < 0.01 && value > 0) return "< $0.01";
+  return `$${value.toFixed(2)}`;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -185,6 +190,37 @@ export default async function UsagePage() {
             </p>
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
               Free tier do Resend: 3.000/mês, 100/dia.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
+              <Bot className="h-4 w-4" />
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                IA do WhatsApp (Claude Haiku)
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+                  {formatUsd(stats.aiUsage.costTodayUsd)}
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  hoje · {stats.aiUsage.callsToday} resposta(s)
+                </p>
+              </div>
+              <div>
+                <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+                  {formatUsd(stats.aiUsage.costThisMonthUsd)}
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  esse mês · {stats.aiUsage.callsThisMonth} resposta(s)
+                </p>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+              Estimativa baseada no preço do Haiku 4.5 ($1/$5 por milhão de tokens de
+              entrada/saída) — não é a fatura oficial da Anthropic, só uma referência.
             </p>
           </div>
 

@@ -114,6 +114,15 @@ create table if not exists whatsapp_messages (
   created_at timestamptz not null default now()
 );
 
+-- Log de uso da IA (Claude Haiku) nas respostas automaticas do WhatsApp,
+-- usado pra estimar custo em USD no painel /usage.
+create table if not exists ai_usage_log (
+  id uuid primary key default uuid_generate_v4(),
+  input_tokens integer not null,
+  output_tokens integer not null,
+  created_at timestamptz not null default now()
+);
+
 -- Expoe o tamanho do banco pro painel /usage (a API de management do
 -- Supabase nao expoe isso de forma self-service com token de acesso).
 create or replace function get_database_size()
@@ -143,3 +152,4 @@ alter table prospection_config enable row level security;
 alter table login_attempts enable row level security;
 alter table whatsapp_conversations enable row level security;
 alter table whatsapp_messages enable row level security;
+alter table ai_usage_log enable row level security;

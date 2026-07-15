@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { startOfTodayBrasiliaISO } from "./timezone";
+import { getAiUsageStats, type AiUsageStats } from "./ai-usage";
 
 function startOfMonthISO(): string {
   const d = new Date();
@@ -16,6 +17,7 @@ export interface UsageStats {
   totalLeads: number;
   totalWithEmail: number;
   databaseSizeBytes: number | null;
+  aiUsage: AiUsageStats;
 }
 
 export async function getUsageStats(): Promise<UsageStats> {
@@ -65,6 +67,7 @@ export async function getUsageStats(): Promise<UsageStats> {
     .not("email", "is", null);
 
   const { data: dbSize } = await supabase.rpc("get_database_size");
+  const aiUsage = await getAiUsageStats();
 
   return {
     hunterCallsThisMonth: hunterCalls ?? 0,
@@ -74,5 +77,6 @@ export async function getUsageStats(): Promise<UsageStats> {
     totalLeads: totalLeads ?? 0,
     totalWithEmail: totalWithEmail ?? 0,
     databaseSizeBytes: dbSize ?? null,
+    aiUsage,
   };
 }

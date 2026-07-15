@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { verifyWhatsappSignature, verifyWhatsappWebhookChallenge } from "@/lib/whatsapp-webhook";
 import { sendWhatsappText } from "@/lib/whatsapp";
 import { generateWhatsappReply } from "@/lib/whatsapp-ai";
+import { logAiUsage } from "@/lib/ai-usage";
 
 // Handshake que a Meta faz uma unica vez ao registrar a URL do webhook no
 // painel do app - so devolve o challenge se o verify token bater.
@@ -85,13 +86,15 @@ async function handleIncomingMessage(from: string, waMessageId: string, body: st
     body
   );
 
-  const replyWaId = await sendWhatsappText(from, reply);
+  await logAiUsage(reply.inputTokens, reply.outputTokens);
+
+  const replyWaId = await sendWhatsappText(from, reply.text);
 
   const now = new Date().toISOString();
   await supabase.from("whatsapp_messages").insert({
     conversation_id: conversation.id,
     direction: "outbound",
-    body: reply,
+    body: reply.text,
     wa_message_id: replyWaId,
   });
   await supabase

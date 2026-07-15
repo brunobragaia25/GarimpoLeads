@@ -36,11 +36,17 @@ tem certeza; se perguntarem algo assim, diga que prefere combinar isso numa liga
 rápida. Nunca finja ser uma pessoa diferente de quem você é.`;
 }
 
+export interface WhatsappReplyResult {
+  text: string;
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export async function generateWhatsappReply(
   lead: WhatsappLeadContext,
   history: WhatsappHistoryMessage[],
   incomingMessage: string
-): Promise<string> {
+): Promise<WhatsappReplyResult> {
   const messages: Anthropic.MessageParam[] = history.map((m) => ({
     role: m.direction === "inbound" ? "user" : "assistant",
     content: m.body,
@@ -55,5 +61,9 @@ export async function generateWhatsappReply(
   });
 
   const textBlock = response.content.find((b) => b.type === "text");
-  return textBlock?.text ?? "";
+  return {
+    text: textBlock?.text ?? "",
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+  };
 }
