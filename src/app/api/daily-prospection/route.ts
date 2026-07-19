@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { scrapeLeadsForQuery, analyzePendingSites, findPendingEmails } from "@/lib/pipeline";
-import { sendFollowUps } from "@/lib/send-outreach";
+import { sendPendingOutreach, sendFollowUps } from "@/lib/send-outreach";
 import { sendPendingWhatsappTemplates, sendPendingWhatsappFollowUps } from "@/lib/send-whatsapp-outreach";
 import { getPairsForDay } from "@/config/prospection";
 
@@ -25,6 +25,10 @@ const PAIRS_PER_DAY = 5;
 const HUNTER_FALLBACK_PER_DAY = 2;
 const SCRAPE_LIMIT_PER_DAY = 150;
 const ANALYZE_LIMIT_PER_DAY = 150;
+
+// Envio inicial de email pros leads com email encontrado - antes só rodava
+// manualmente pelo botao do dashboard, nunca fazia parte do cron.
+const EMAIL_SEND_LIMIT_PER_DAY = 100;
 
 // Follow-up automático pra quem foi contatado e não respondeu.
 const FOLLOWUP_DAYS_THRESHOLD = 5;
@@ -52,6 +56,7 @@ export async function GET(req: NextRequest) {
   const errors: string[] = [];
   let leadsFound = 0;
   let emailsFound = 0;
+  let emailsSent = 0;
   let followUpsSent = 0;
   let whatsappTemplatesSent = 0;
   let whatsappFollowUpsSent = 0;
@@ -105,6 +110,18 @@ export async function GET(req: NextRequest) {
       }
     } else {
       errors.push("find-emails: pulado por falta de tempo");
+    }
+
+    if (timeLeft() > 10_000) {
+      try {
+        const outreachResult = await sendPendingOutreach(EMAIL_SEND_LIMIT_PER_DAY);
+        emailsSent = outreachResult.sent;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "erro desconhecido";
+        errors.push(`send-outreach: ${message}`);
+      }
+    } else {
+      errors.push("send-outreach: pulado por falta de tempo");
     }
 
     if (timeLeft() > 10_000) {
@@ -163,6 +180,7 @@ export async function GET(req: NextRequest) {
     pairs_processed: pairs,
     leads_found: leadsFound,
     emails_found: emailsFound,
+    emails_sent: emailsSent,
     follow_ups_sent: followUpsSent,
     whatsapp_templates_sent: whatsappTemplatesSent,
     whatsapp_followups_sent: whatsappFollowUpsSent,
