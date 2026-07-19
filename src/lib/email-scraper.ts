@@ -43,6 +43,11 @@ const BLOCKED_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"];
 
 const CONTACT_PAGE_PATTERN = /href="([^"]*(?:contato|contact|fale-?conosco|sobre)[^"]*)"/i;
 
+// Fallback quando nao acha link de contato no HTML da home (comum em sites
+// com menu renderizado via JS, onde o regex acima nunca casa) - tenta os
+// caminhos mais comuns direto, mesmo sem link visivel na home.
+const COMMON_CONTACT_PATHS = ["/contato", "/contact", "/fale-conosco", "/atendimento"];
+
 // Alguns sites tem mailto: com espaco (as vezes %20) grudado antes do
 // email por erro de template; sem isso o email vira "%20fulano@..." e
 // sempre da bounce.
@@ -85,12 +90,38 @@ function resolveUrl(base: string, path: string): string | null {
   }
 }
 
-async function fetchHtml(url: string): Promise<string> {
+async function fetchHtml(url: string, timeout = 8000): Promise<string> {
   const { data } = await axios.get<string>(url, {
-    timeout: 8000,
+    timeout,
     headers: { "User-Agent": "Mozilla/5.0 (compatible; GarimpoLeadsBot/1.0)" },
   });
   return data;
+}
+
+// Tenta os caminhos comuns de contato direto, um por um, parando no
+// primeiro que responder com um email. Timeout curto (5s) porque isso so
+// roda quando a home ja nao deu certo - nao vale gastar o orcamento de
+// tempo do cron inteiro tentando caminho que nem existe.
+async function tryCommonContactPaths(website: string): Promise<ScrapedEmailResult | null> {
+  for (const path of COMMON_CONTACT_PATHS) {
+    const url = resolveUrl(website, path);
+    if (!url) continue;
+
+    try {
+      const html = await fetchHtml(url, 5000);
+      const found = extractEmails(html);
+
+      if (found.mailto.length > 0) {
+        return { email: found.mailto[0], confidence: 80, source: `mailto_guessed_${path}` };
+      }
+      if (found.text.length > 0) {
+        return { email: found.text[0], confidence: 50, source: `text_guessed_${path}` };
+      }
+    } catch {
+      // caminho nao existe ou deu erro - tenta o proximo
+    }
+  }
+  return null;
 }
 
 export async function scrapeEmailFromWebsite(website: string): Promise<ScrapedEmailResult> {
@@ -109,17 +140,25 @@ export async function scrapeEmailFromWebsite(website: string): Promise<ScrapedEm
     if (contactMatch) {
       const contactUrl = resolveUrl(website, contactMatch[1]);
       if (contactUrl) {
-        const contactHtml = await fetchHtml(contactUrl);
-        const contact = extractEmails(contactHtml);
+        try {
+          const contactHtml = await fetchHtml(contactUrl);
+          const contact = extractEmails(contactHtml);
 
-        if (contact.mailto.length > 0) {
-          return { email: contact.mailto[0], confidence: 85, source: "mailto_contact_page" };
-        }
-        if (contact.text.length > 0) {
-          return { email: contact.text[0], confidence: 55, source: "text_contact_page" };
+          if (contact.mailto.length > 0) {
+            return { email: contact.mailto[0], confidence: 85, source: "mailto_contact_page" };
+          }
+          if (contact.text.length > 0) {
+            return { email: contact.text[0], confidence: 55, source: "text_contact_page" };
+          }
+        } catch {
+          // link de contato existia mas falhou ao carregar - segue pro
+          // fallback de caminhos comuns abaixo
         }
       }
     }
+
+    const guessed = await tryCommonContactPaths(website);
+    if (guessed) return guessed;
 
     return { email: null, confidence: 0, source: "not_found" };
   } catch {
