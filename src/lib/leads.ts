@@ -34,6 +34,8 @@ export interface LeadWithDetails {
   clicked_at: string | null;
   crm_synced_at: string | null;
   social_platform: SocialPlatform | null;
+  whatsapp_template_sent_at: string | null;
+  whatsapp_followup_sent_at: string | null;
 }
 
 // Teto de segurança pra não puxar uma tabela ilimitada de uma vez; o cron
@@ -55,7 +57,7 @@ export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
   for (let offset = 0; offset < MAX_LEADS; offset += POSTGREST_PAGE_SIZE) {
     const { data, error } = await supabase
       .from("leads")
-      .select("*, site_analysis(*), outreach(*)")
+      .select("*, site_analysis(*), outreach(*), whatsapp_conversations(*)")
       .order("created_at", { ascending: false })
       .range(offset, Math.min(offset + POSTGREST_PAGE_SIZE, MAX_LEADS) - 1);
 
@@ -69,6 +71,9 @@ export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
   return rows.map((lead) => {
     const analysis = Array.isArray(lead.site_analysis) ? lead.site_analysis[0] : null;
     const outreach = Array.isArray(lead.outreach) ? lead.outreach[0] : null;
+    const whatsappConv = Array.isArray(lead.whatsapp_conversations)
+      ? lead.whatsapp_conversations[0]
+      : null;
 
     return {
       id: lead.id,
@@ -93,6 +98,8 @@ export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
       clicked_at: outreach?.clicked_at ?? null,
       crm_synced_at: lead.crm_synced_at ?? null,
       social_platform: detectSocialPlatform(lead.website),
+      whatsapp_template_sent_at: whatsappConv?.template_sent_at ?? null,
+      whatsapp_followup_sent_at: whatsappConv?.followup_sent_at ?? null,
     };
   });
 }

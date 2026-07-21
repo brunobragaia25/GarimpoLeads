@@ -303,8 +303,12 @@ export default async function Home({
   const emailContacted = allLeads.filter(
     (l) => l.email && l.outreach_status === "contacted"
   ).length;
+  // Conta tanto a marcacao manual antiga (lead sem email marcado
+  // "contacted" na tabela de outreach - fluxo pre-automacao) quanto o
+  // envio automatico real via IA (whatsapp_conversations.template_sent_at),
+  // que fica numa tabela separada e nao aparecia aqui antes.
   const whatsappContacted = allLeads.filter(
-    (l) => !l.email && l.outreach_status === "contacted"
+    (l) => (!l.email && l.outreach_status === "contacted") || l.whatsapp_template_sent_at
   ).length;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
