@@ -6,6 +6,32 @@ import { startOfTodayBrasiliaISO } from "./timezone";
 
 const DEFAULT_DAILY_LIMIT = 20;
 
+// O PostgREST do Supabase trunca qualquer resposta em 1000 linhas (config
+// "Max Rows" do projeto) mesmo com `.limit()` maior no client - sem paginar
+// com `.range()`, as buscas abaixo passavam a ignorar todo registro além da
+// linha 1000, arriscando reenviar template pra quem já tinha conversa.
+const POSTGREST_PAGE_SIZE = 1000;
+
+async function fetchAllColumn(table: string, column: string): Promise<string[]> {
+  const rows: string[] = [];
+
+  for (let offset = 0; ; offset += POSTGREST_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(column)
+      .range(offset, offset + POSTGREST_PAGE_SIZE - 1);
+
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rows.push(...(data as any[]).map((r) => r[column]));
+    if (data.length < POSTGREST_PAGE_SIZE) break;
+  }
+
+  return rows;
+}
+
 interface CandidateLead {
   id: string;
   name: string;
@@ -47,24 +73,27 @@ export async function sendPendingWhatsappTemplates(limit = 20) {
     return { sent: 0, failed: 0, total: 0, daily_limit_reached: true, sent_today: alreadySentToday, daily_limit: dailyLimit };
   }
 
-  const { data: existing, error: existingError } = await supabase
-    .from("whatsapp_conversations")
-    .select("lead_id");
-  if (existingError) throw new Error(existingError.message);
-  const existingLeadIds = new Set((existing ?? []).map((c) => c.lead_id));
+  const existingLeadIds = new Set(await fetchAllColumn("whatsapp_conversations", "lead_id"));
 
   // Janela grande + filtro em memoria depois: mesmo padrao ja usado em
   // findPendingEmails/analyzePendingSites pra nao travar nos leads mais
   // antigos quando eles ja tiverem todos conversa iniciada.
-  const { data: leads, error: leadsError } = await supabase
-    .from("leads")
-    .select("id, name, category, phone, website")
-    .not("phone", "is", null)
-    .order("created_at", { ascending: true })
-    .limit(5000);
-  if (leadsError) throw new Error(leadsError.message);
+  const leads: CandidateLead[] = [];
+  for (let offset = 0; ; offset += POSTGREST_PAGE_SIZE) {
+    const { data, error: leadsError } = await supabase
+      .from("leads")
+      .select("id, name, category, phone, website")
+      .not("phone", "is", null)
+      .order("created_at", { ascending: true })
+      .range(offset, offset + POSTGREST_PAGE_SIZE - 1);
+    if (leadsError) throw new Error(leadsError.message);
+    if (!data || data.length === 0) break;
 
-  const pending = (leads ?? [])
+    leads.push(...data);
+    if (data.length < POSTGREST_PAGE_SIZE) break;
+  }
+
+  const pending = leads
     .filter((l): l is CandidateLead => !existingLeadIds.has(l.id))
     .filter((l) => hasUsablePhone(l.phone))
     .filter((l) => detectSocialPlatform(l.website) === null)

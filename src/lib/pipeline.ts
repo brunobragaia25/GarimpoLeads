@@ -5,6 +5,102 @@ import { analyzeSite } from "./site-analysis";
 import { findEmailForWebsite } from "./hunter";
 import { scrapeEmailFromWebsite } from "./email-scraper";
 
+// O PostgREST do Supabase trunca qualquer resposta em 1000 linhas (config
+// "Max Rows" do projeto) mesmo com `.limit()` maior no client - sem paginar
+// com `.range()`, as checagens de duplicidade abaixo passavam a ignorar
+// todo lead além da linha 1000 assim que a tabela cresceu, permitindo
+// duplicata silenciosa uma vez que o total passou de 1000 leads.
+const POSTGREST_PAGE_SIZE = 1000;
+
+async function fetchAllLeadNamesAndAddresses(category: string): Promise<{ name: string; address: string | null }[]> {
+  const rows: { name: string; address: string | null }[] = [];
+
+  for (let offset = 0; ; offset += POSTGREST_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("leads")
+      .select("name, address")
+      .eq("category", category)
+      .range(offset, offset + POSTGREST_PAGE_SIZE - 1);
+
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+
+    rows.push(...data);
+    if (data.length < POSTGREST_PAGE_SIZE) break;
+  }
+
+  return rows;
+}
+
+async function fetchAllLeadPhones(): Promise<{ phone: string | null }[]> {
+  const rows: { phone: string | null }[] = [];
+
+  for (let offset = 0; ; offset += POSTGREST_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("leads")
+      .select("phone")
+      .range(offset, offset + POSTGREST_PAGE_SIZE - 1);
+
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+
+    rows.push(...data);
+    if (data.length < POSTGREST_PAGE_SIZE) break;
+  }
+
+  return rows;
+}
+
+// Usado tanto pra achar leads sem site (classificação instantânea) quanto
+// leads com site (precisa analisar de verdade) - mesma paginação nos dois
+// casos, só muda o filtro de presença de website.
+async function fetchAllLeadsByWebsitePresence(
+  hasWebsite: boolean
+): Promise<{ id: string; website: string | null }[]> {
+  const rows: { id: string; website: string | null }[] = [];
+
+  for (let offset = 0; ; offset += POSTGREST_PAGE_SIZE) {
+    let query = supabase
+      .from("leads")
+      .select("id, website")
+      .order("created_at", { ascending: true })
+      .range(offset, offset + POSTGREST_PAGE_SIZE - 1);
+
+    query = hasWebsite ? query.not("website", "is", null) : query.is("website", null);
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+
+    rows.push(...data);
+    if (data.length < POSTGREST_PAGE_SIZE) break;
+  }
+
+  return rows;
+}
+
+// Coluna única (ex: "lead_id") de outra tabela, paginada - usado pra montar
+// os conjuntos "já processado" (site_analysis, outreach, whatsapp_conversations).
+async function fetchAllColumn(table: string, column: string): Promise<string[]> {
+  const rows: string[] = [];
+
+  for (let offset = 0; ; offset += POSTGREST_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(column)
+      .range(offset, offset + POSTGREST_PAGE_SIZE - 1);
+
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rows.push(...(data as any[]).map((r) => r[column]));
+    if (data.length < POSTGREST_PAGE_SIZE) break;
+  }
+
+  return rows;
+}
+
 // Roda ate `concurrency` chamadas de `fn` em paralelo em vez de uma por
 // vez, pra aproveitar melhor o orcamento de tempo do cron diario (a
 // maior parte do tempo de analise/busca de email e so esperando resposta
@@ -34,13 +130,10 @@ export async function scrapeLeadsForQuery(category: string, location: string) {
   const found = await searchLeads(category, location);
   const deduped = deduplicateLeads(found);
 
-  const { data: existing } = await supabase
-    .from("leads")
-    .select("name, address")
-    .eq("category", category);
+  const existing = await fetchAllLeadNamesAndAddresses(category);
 
   const existingKeys = new Set(
-    (existing ?? []).map(
+    existing.map(
       (l) => `${l.name.trim().toLowerCase()}|${(l.address ?? "").trim().toLowerCase()}`
     )
   );
@@ -49,9 +142,9 @@ export async function scrapeLeadsForQuery(category: string, location: string) {
   // evitar contatar o mesmo negócio duas vezes se ele aparecer em buscas
   // de nichos diferentes (ex: escritório que é ao mesmo tempo "advogados"
   // e "escritórios de contabilidade").
-  const { data: existingPhones } = await supabase.from("leads").select("phone");
+  const existingPhones = await fetchAllLeadPhones();
   const existingPhoneSet = new Set(
-    (existingPhones ?? [])
+    existingPhones
       .map((l) => normalizePhone(l.phone))
       .filter((p): p is string => p !== null)
   );
@@ -79,8 +172,7 @@ export async function scrapeLeadsForQuery(category: string, location: string) {
 }
 
 export async function analyzePendingSites(limit = 50) {
-  const { data: analyzed } = await supabase.from("site_analysis").select("lead_id");
-  const analyzedIds = new Set((analyzed ?? []).map((a) => a.lead_id));
+  const analyzedIds = new Set(await fetchAllColumn("site_analysis", "lead_id"));
 
   // Janela bem maior que o total esperado de leads, com o filtro de "ja
   // analisado" aplicado DEPOIS da busca: se o limite da query fosse
@@ -92,32 +184,18 @@ export async function analyzePendingSites(limit = 50) {
   // (analyzeSite retorna instantaneo quando `website` e null) - por isso
   // vao primeiro: sao o foco do negocio (prospect direto pra vender site)
   // e nao custam nada do orcamento de tempo.
-  const { data: noWebsiteLeads, error: noWebsiteError } = await supabase
-    .from("leads")
-    .select("id, website")
-    .is("website", null)
-    .order("created_at", { ascending: true })
-    .limit(5000);
+  const noWebsiteLeads = await fetchAllLeadsByWebsitePresence(false);
 
-  if (noWebsiteError) throw new Error(noWebsiteError.message);
-
-  const pendingNoWebsite = (noWebsiteLeads ?? [])
+  const pendingNoWebsite = noWebsiteLeads
     .filter((l) => !analyzedIds.has(l.id))
     .slice(0, limit);
   const remainingSlots = limit - pendingNoWebsite.length;
 
   let pendingWithWebsite: { id: string; website: string | null }[] = [];
   if (remainingSlots > 0) {
-    const { data: withWebsiteLeads, error: withWebsiteError } = await supabase
-      .from("leads")
-      .select("id, website")
-      .not("website", "is", null)
-      .order("created_at", { ascending: true })
-      .limit(5000);
+    const withWebsiteLeads = await fetchAllLeadsByWebsitePresence(true);
 
-    if (withWebsiteError) throw new Error(withWebsiteError.message);
-
-    pendingWithWebsite = (withWebsiteLeads ?? [])
+    pendingWithWebsite = withWebsiteLeads
       .filter((l) => !analyzedIds.has(l.id))
       .slice(0, remainingSlots);
   }
@@ -144,22 +222,14 @@ export async function analyzePendingSites(limit = 50) {
 // proximo dia; leads em que o Hunter foi consultado e nao achou nada ganham
 // registro com email null, pra nao queimar a cota de novo no mesmo lead.
 export async function findPendingEmails(hunterLimit = 2, scrapeLimit = 100) {
-  const { data: existing } = await supabase.from("outreach").select("lead_id");
-  const processedIds = new Set((existing ?? []).map((o) => o.lead_id));
+  const processedIds = new Set(await fetchAllColumn("outreach", "lead_id"));
 
   // Ordenado do mais antigo pro mais novo, e limite bem acima do total de
   // leads-com-site esperado, senao um teto baixo faz o mesmo lote antigo
   // ser reconsiderado pra sempre enquanto leads novos nunca sao alcancados.
-  const { data: leads, error } = await supabase
-    .from("leads")
-    .select("id, website")
-    .not("website", "is", null)
-    .order("created_at", { ascending: true })
-    .limit(5000);
+  const leads = await fetchAllLeadsByWebsitePresence(true);
 
-  if (error) throw new Error(error.message);
-
-  const pending = (leads ?? [])
+  const pending = leads
     .filter((l) => !processedIds.has(l.id))
     .slice(0, scrapeLimit);
 

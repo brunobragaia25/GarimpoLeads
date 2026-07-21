@@ -40,16 +40,33 @@ export interface LeadWithDetails {
 // adiciona algumas centenas de leads por semana, então isso cobre meses.
 const MAX_LEADS = 5000;
 
+// O PostgREST do Supabase trunca silenciosamente qualquer resposta em 1000
+// linhas (configuração "Max Rows" do projeto), não importa o que o
+// `.limit()` do client peça - sem paginar explicitamente com `.range()`,
+// tudo que passa de 1000 leads simplesmente some da resposta sem erro
+// nenhum. Foi isso que fez o dashboard inteiro (total, prospects, com
+// email etc.) parecer travado assim que a tabela passou de 1000 linhas.
+const POSTGREST_PAGE_SIZE = 1000;
+
 export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
-  const { data, error } = await supabase
-    .from("leads")
-    .select("*, site_analysis(*), outreach(*)")
-    .order("created_at", { ascending: false })
-    .limit(MAX_LEADS);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: any[] = [];
 
-  if (error) throw new Error(error.message);
+  for (let offset = 0; offset < MAX_LEADS; offset += POSTGREST_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("leads")
+      .select("*, site_analysis(*), outreach(*)")
+      .order("created_at", { ascending: false })
+      .range(offset, Math.min(offset + POSTGREST_PAGE_SIZE, MAX_LEADS) - 1);
 
-  return (data ?? []).map((lead) => {
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+
+    rows.push(...data);
+    if (data.length < POSTGREST_PAGE_SIZE) break;
+  }
+
+  return rows.map((lead) => {
     const analysis = Array.isArray(lead.site_analysis) ? lead.site_analysis[0] : null;
     const outreach = Array.isArray(lead.outreach) ? lead.outreach[0] : null;
 
