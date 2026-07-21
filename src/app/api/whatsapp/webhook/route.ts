@@ -5,6 +5,7 @@ import { sendWhatsappText } from "@/lib/whatsapp";
 import { generateWhatsappReply } from "@/lib/whatsapp-ai";
 import { logAiUsage } from "@/lib/ai-usage";
 import { detectNegativeIntent } from "@/lib/negative-intent";
+import { detectBotReply } from "@/lib/bot-reply-detection";
 import { notifyTelegram } from "@/lib/telegram";
 
 const CLOSING_MESSAGE =
@@ -165,6 +166,11 @@ async function handleIncomingMessage(from: string, waMessageId: string, body: st
     }
     return;
   }
+
+  // Mensagem automatica do outro lado (autoresponder, assistente virtual
+  // do proprio lead, etc.) - nao responde nada, pra nao entrar num loop de
+  // duas IAs conversando sozinhas gastando tokens de verdade a cada troca.
+  if (detectBotReply(body)) return;
 
   const { data: lead } = await supabase
     .from("leads")
