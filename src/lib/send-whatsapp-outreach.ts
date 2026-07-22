@@ -117,11 +117,18 @@ export async function sendPendingWhatsappTemplates(limit = 20) {
     if (data.length < POSTGREST_PAGE_SIZE) break;
   }
 
-  const pending = leads
+  const eligible = leads
     .filter((l): l is CandidateLead => !existingLeadIds.has(l.id))
     .filter((l) => hasUsablePhone(l.phone))
-    .filter((l) => detectSocialPlatform(l.website) === null)
-    .slice(0, effectiveLimit);
+    .filter((l) => detectSocialPlatform(l.website) === null);
+
+  // Prioriza quem nao tem site - e o foco principal do negocio (prospect
+  // direto pra vender site do zero), mesmo padrao ja usado em
+  // analyzePendingSites. Dentro de cada grupo mantem a ordem cronologica
+  // (mais antigo primeiro).
+  const noWebsite = eligible.filter((l) => !l.website);
+  const withWebsite = eligible.filter((l) => !!l.website);
+  const pending = [...noWebsite, ...withWebsite].slice(0, effectiveLimit);
 
   const analysisByLead = await fetchLatestAnalysisByLead(
     pending.filter((l) => l.website).map((l) => l.id)
