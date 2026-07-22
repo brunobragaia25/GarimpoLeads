@@ -3,6 +3,30 @@ import { sendWhatsappTemplate, toWhatsappPhone } from "./whatsapp";
 import { hasUsablePhone } from "./phone";
 import { detectSocialPlatform } from "./social-link";
 import { startOfTodayBrasiliaISO } from "./timezone";
+import { buildProblemSummary, type SiteAnalysisSummary } from "./template";
+
+// "com_site_v2" acrescenta uma 3a variavel ({{3}}) com o achado real da
+// analise do site (mesmo padrao ja usado no email) - "com_site_v1" so tem
+// {{1}}/{{2}} e quebraria se mandasse variavel a mais. Assim que o template
+// v2 aprovar na Meta, so trocar WHATSAPP_TEMPLATE_HAS_SITE_NAME pro nome
+// dele que o codigo ja passa a incluir a 3a variavel sozinho.
+const TEMPLATE_WITH_PROBLEM_VARIABLE = "com_site_v2";
+
+async function fetchLatestAnalysisByLead(leadIds: string[]): Promise<Map<string, SiteAnalysisSummary>> {
+  const map = new Map<string, SiteAnalysisSummary>();
+  if (leadIds.length === 0) return map;
+
+  const { data: analyses } = await supabase
+    .from("site_analysis")
+    .select("lead_id, performance_score, is_slow, is_outdated, is_wordpress, analyzed_at")
+    .in("lead_id", leadIds)
+    .order("analyzed_at", { ascending: false });
+
+  for (const a of analyses ?? []) {
+    if (!map.has(a.lead_id)) map.set(a.lead_id, a);
+  }
+  return map;
+}
 
 const DEFAULT_DAILY_LIMIT = 20;
 
@@ -99,6 +123,10 @@ export async function sendPendingWhatsappTemplates(limit = 20) {
     .filter((l) => detectSocialPlatform(l.website) === null)
     .slice(0, effectiveLimit);
 
+  const analysisByLead = await fetchLatestAnalysisByLead(
+    pending.filter((l) => l.website).map((l) => l.id)
+  );
+
   let sent = 0;
   let failed = 0;
 
@@ -107,7 +135,13 @@ export async function sendPendingWhatsappTemplates(limit = 20) {
     const templateName = hasWebsite
       ? process.env.WHATSAPP_TEMPLATE_HAS_SITE_NAME!
       : process.env.WHATSAPP_TEMPLATE_NO_SITE_NAME!;
-    const variables = hasWebsite ? [lead.name, lead.category] : [lead.name];
+
+    const variables =
+      hasWebsite && templateName === TEMPLATE_WITH_PROBLEM_VARIABLE
+        ? [lead.name, lead.category, buildProblemSummary(analysisByLead.get(lead.id) ?? null)]
+        : hasWebsite
+          ? [lead.name, lead.category]
+          : [lead.name];
 
     try {
       const waMessageId = await sendWhatsappTemplate(lead.phone!, templateName, variables);
