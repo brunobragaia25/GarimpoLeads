@@ -65,9 +65,12 @@ async function findOrCreateConversation(
       body,
       wa_message_id: waMessageId,
     });
+    // Se o Bruno tinha "apagado" (exclusao suave) essa conversa da lista e o
+    // lead respondeu de verdade depois, reaparece na lista de novo em vez de
+    // ficar escondida pra sempre.
     await supabase
       .from("whatsapp_conversations")
-      .update({ last_inbound_at: new Date().toISOString() })
+      .update({ last_inbound_at: new Date().toISOString(), deleted_at: null })
       .eq("id", existing.id);
     return existing;
   }
@@ -147,6 +150,29 @@ async function handleIncomingMessage(from: string, waMessageId: string, body: st
   // Falha ao criar lead/conversa - já logado dentro de findOrCreateConversation.
   if (!conversation) return;
 
+  // Mensagem automatica do outro lado (autoresponder, assistente virtual
+  // do proprio lead, etc.) - nao responde nada, pra nao entrar num loop de
+  // duas IAs conversando sozinhas gastando tokens de verdade a cada troca.
+  // Verificado antes do resto (inclusive da notificacao) pra nao acordar o
+  // Bruno no celular/Mac toda vez que um bot repete a mesma mensagem.
+  if (detectBotReply(body)) return;
+  if (await isRepeatedInboundMessage(conversation.id, body)) return;
+
+  const { data: leadForNotify } = await supabase
+    .from("leads")
+    .select("name")
+    .eq("id", conversation.lead_id)
+    .maybeSingle();
+
+  // Avisa no Telegram (aparece como notificacao nativa no celular e no Mac,
+  // via app do Telegram) em toda resposta de verdade - independe da IA
+  // estar ativa ou nao nessa conversa, pra nunca passar batido uma resposta
+  // so porque o Bruno ja tinha assumido a conversa manualmente antes.
+  const chatUrlForNotify = `${process.env.APP_URL}/whatsapp-chats/${conversation.id}`;
+  await notifyTelegram(
+    `Nova resposta no WhatsApp\n\nLead: ${leadForNotify?.name ?? "desconhecido"}\n\n${chatUrlForNotify}`
+  );
+
   // Depois que o humano manda uma mensagem manual pela tela de chat, a IA
   // fica pausada nessa conversa especifica ate ele reativar - evita a IA
   // responder por cima de uma intervencao manual.
@@ -187,12 +213,6 @@ async function handleIncomingMessage(from: string, waMessageId: string, body: st
     }
     return;
   }
-
-  // Mensagem automatica do outro lado (autoresponder, assistente virtual
-  // do proprio lead, etc.) - nao responde nada, pra nao entrar num loop de
-  // duas IAs conversando sozinhas gastando tokens de verdade a cada troca.
-  if (detectBotReply(body)) return;
-  if (await isRepeatedInboundMessage(conversation.id, body)) return;
 
   const { data: lead } = await supabase
     .from("leads")

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Bot, BotOff, Loader2, Send } from "lucide-react";
+import { ArrowLeft, Bot, BotOff, CheckSquare, Loader2, Send, Square, Trash2 } from "lucide-react";
 import type { WhatsappConversationDetail } from "@/lib/whatsapp-chats";
 
 function formatTime(iso: string): string {
@@ -20,8 +20,46 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [togglingAi, setTogglingAi] = useState(false);
+  const [deletingConversation, setDeletingConversation] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  function toggleSelected(messageId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) next.delete(messageId);
+      else next.add(messageId);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) =>
+      prev.size === conversation.messages.length
+        ? new Set()
+        : new Set(conversation.messages.map((m) => m.id))
+    );
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    const res = await fetch(`/api/whatsapp-chats/${conversation.id}/messages`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messageIds: Array.from(selectedIds) }),
+    });
+    setBulkDeleting(false);
+    if (!res.ok) {
+      setError("Erro ao excluir mensagens selecionadas");
+      return;
+    }
+    setSelectedIds(new Set());
+    router.refresh();
+  }
 
   // Busca mensagem nova a cada poucos segundos, sem precisar recarregar a
   // pagina na mao - o router.refresh() so busca de novo o server component,
@@ -32,6 +70,36 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
     }, 4000);
     return () => clearInterval(interval);
   }, [router]);
+
+  // Zera a badge de "nao lida" assim que o Bruno abre a conversa.
+  useEffect(() => {
+    fetch(`/api/whatsapp-chats/${conversation.id}/mark-read`, { method: "POST" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation.id]);
+
+  async function handleDeleteConversation() {
+    setDeletingConversation(true);
+    const res = await fetch(`/api/whatsapp-chats/${conversation.id}`, { method: "DELETE" });
+    setDeletingConversation(false);
+    if (!res.ok) {
+      setError("Erro ao excluir conversa");
+      return;
+    }
+    router.push("/whatsapp-chats");
+  }
+
+  async function handleDeleteMessage(messageId: string) {
+    setDeletingMessageId(messageId);
+    const res = await fetch(`/api/whatsapp-chats/${conversation.id}/messages/${messageId}`, {
+      method: "DELETE",
+    });
+    setDeletingMessageId(null);
+    if (!res.ok) {
+      setError("Erro ao excluir mensagem");
+      return;
+    }
+    router.refresh();
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -72,7 +140,7 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
   }
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="flex h-full flex-col bg-white dark:bg-zinc-950">
       <div className="flex items-center gap-3 border-b border-zinc-100 px-4 py-3 dark:border-zinc-900">
         <a
           href="/whatsapp-chats"
@@ -108,6 +176,44 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
           )}
           {conversation.aiEnabled ? "IA ativa" : "IA pausada"}
         </button>
+        <button
+          onClick={handleDeleteConversation}
+          disabled={deletingConversation}
+          title="Excluir conversa inteira"
+          className="inline-flex shrink-0 items-center justify-center rounded-full p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+        >
+          {deletingConversation ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Trash2 className="h-4 w-4" />
+          )}
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50 px-4 py-2 dark:border-zinc-900 dark:bg-zinc-900/50">
+        <button
+          onClick={toggleSelectAll}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+        >
+          {selectedIds.size === conversation.messages.length && conversation.messages.length > 0 ? (
+            <CheckSquare className="h-3.5 w-3.5" />
+          ) : (
+            <Square className="h-3.5 w-3.5" />
+          )}
+          Selecionar tudo
+        </button>
+        <button
+          onClick={handleBulkDelete}
+          disabled={selectedIds.size === 0 || bulkDeleting}
+          className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-40"
+        >
+          {bulkDeleting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Trash2 className="h-3.5 w-3.5" />
+          )}
+          Excluir selecionadas ({selectedIds.size})
+        </button>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
@@ -116,11 +222,39 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
             Nenhuma mensagem trocada ainda.
           </p>
         )}
-        {conversation.messages.map((m, i) => (
+        {conversation.messages.map((m) => (
           <div
-            key={i}
-            className={`flex ${m.direction === "outbound" ? "justify-end" : "justify-start"}`}
+            key={m.id}
+            className={`flex items-center gap-1.5 ${
+              m.direction === "outbound" ? "justify-end" : "justify-start"
+            }`}
           >
+            {m.direction === "outbound" && (
+              <>
+                <button
+                  onClick={() => toggleSelected(m.id)}
+                  className="shrink-0 rounded-md p-1 text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-200"
+                >
+                  {selectedIds.has(m.id) ? (
+                    <CheckSquare className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                </button>
+                <button
+                  onClick={() => handleDeleteMessage(m.id)}
+                  disabled={deletingMessageId === m.id}
+                  title="Excluir mensagem"
+                  className="shrink-0 rounded-md p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:text-zinc-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                >
+                  {deletingMessageId === m.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </>
+            )}
             <div
               className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
                 m.direction === "outbound"
@@ -137,6 +271,32 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
                 {formatTime(m.createdAt)}
               </p>
             </div>
+            {m.direction === "inbound" && (
+              <>
+                <button
+                  onClick={() => handleDeleteMessage(m.id)}
+                  disabled={deletingMessageId === m.id}
+                  title="Excluir mensagem"
+                  className="shrink-0 rounded-md p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:text-zinc-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                >
+                  {deletingMessageId === m.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                <button
+                  onClick={() => toggleSelected(m.id)}
+                  className="shrink-0 rounded-md p-1 text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-200"
+                >
+                  {selectedIds.has(m.id) ? (
+                    <CheckSquare className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                </button>
+              </>
+            )}
           </div>
         ))}
         <div ref={messagesEndRef} />

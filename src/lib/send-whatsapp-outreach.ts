@@ -215,6 +215,7 @@ export async function sendPendingWhatsappFollowUps(daysThreshold = 5, limit = 20
     .select("id, phone, lead_id, leads(name)")
     .is("last_inbound_at", null)
     .is("followup_sent_at", null)
+    .is("deleted_at", null)
     .lte("template_sent_at", cutoff.toISOString())
     .order("template_sent_at", { ascending: true })
     .limit(effectiveLimit);

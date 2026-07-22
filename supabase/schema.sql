@@ -99,6 +99,11 @@ create table if not exists whatsapp_conversations (
   followup_sent_at timestamptz, -- follow-up automatico pra quem nunca respondeu ao template inicial
   last_outbound_at timestamptz,
   last_inbound_at timestamptz,
+  last_read_at timestamptz, -- quando o Bruno abriu essa conversa por ultimo, pra badge de "nao lida"
+  deleted_at timestamptz, -- exclusao "suave": some da lista/chat, mas mantem o registro pra nunca
+  -- reenviar template pro mesmo lead nem perder a contagem de envios do dia
+  pinned_at timestamptz, -- conversa fixada no topo da lista, igual WhatsApp
+  favorited_at timestamptz, -- conversa favoritada, pra filtrar so as favoritas
   status text not null default 'template_sent', -- template_sent | open | closed
   ai_enabled boolean not null default true, -- false depois que o humano manda mensagem manual
   created_at timestamptz not null default now()
