@@ -120,6 +120,27 @@ async function findOrCreateConversation(
   return newConversation;
 }
 
+// Sinal generico de loop de bot, independente de idioma/formato: se a MESMA
+// mensagem ja apareceu antes vinda do lead nessa conversa, e quase certeza
+// de que e um autoresponder mandando o mesmo texto de novo (pessoa real nao
+// repete a mensagem identica sozinha) - pega padroes que os regex de
+// bot-reply-detection.ts nao previram.
+async function isRepeatedInboundMessage(conversationId: string, body: string): Promise<boolean> {
+  const normalized = body.trim().toLowerCase();
+  const { data } = await supabase
+    .from("whatsapp_messages")
+    .select("body")
+    .eq("conversation_id", conversationId)
+    .eq("direction", "inbound")
+    .order("created_at", { ascending: false })
+    .limit(6);
+
+  // A mensagem atual ja foi inserida em findOrCreateConversation antes de
+  // chegar aqui, entao 2+ ocorrencias identicas = ja repetiu pelo menos uma vez.
+  const matches = (data ?? []).filter((m) => m.body.trim().toLowerCase() === normalized);
+  return matches.length >= 2;
+}
+
 async function handleIncomingMessage(from: string, waMessageId: string, body: string, profileName?: string) {
   const conversation = await findOrCreateConversation(from, waMessageId, body, profileName);
 
@@ -171,6 +192,7 @@ async function handleIncomingMessage(from: string, waMessageId: string, body: st
   // do proprio lead, etc.) - nao responde nada, pra nao entrar num loop de
   // duas IAs conversando sozinhas gastando tokens de verdade a cada troca.
   if (detectBotReply(body)) return;
+  if (await isRepeatedInboundMessage(conversation.id, body)) return;
 
   const { data: lead } = await supabase
     .from("leads")
