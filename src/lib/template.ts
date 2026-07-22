@@ -117,6 +117,13 @@ export interface SiteAnalysisSummary {
   is_slow: boolean | null;
   is_outdated: boolean | null;
   is_wordpress: boolean | null;
+  notes?: string | null;
+}
+
+function extractLoadSeconds(notes: string | null | undefined): string | null {
+  const match = notes?.match(/Carregou em (\d+)ms/);
+  if (!match) return null;
+  return (Number(match[1]) / 1000).toFixed(1).replace(".", ",");
 }
 
 // Converte os achados reais da análise do site (site_analysis) numa frase
@@ -129,13 +136,24 @@ export function buildProblemSummary(analysis: SiteAnalysisSummary | null): strin
 
   const parts: string[] = [];
   if (analysis.is_slow || (analysis.performance_score !== null && analysis.performance_score < 50)) {
-    parts.push("o carregamento tá bem lento");
+    const seconds = extractLoadSeconds(analysis.notes);
+    if (seconds && analysis.performance_score !== null) {
+      parts.push(
+        `o site demora ${seconds} segundos pra carregar (nota de performance é só ${analysis.performance_score} de 100)`
+      );
+    } else if (seconds) {
+      parts.push(`o site demora ${seconds} segundos pra carregar`);
+    } else if (analysis.performance_score !== null) {
+      parts.push(`o site tem nota de performance baixa (${analysis.performance_score} de 100)`);
+    } else {
+      parts.push("o carregamento tá bem lento");
+    }
   }
   if (analysis.is_outdated) {
     parts.push("o visual parece desatualizado");
   }
   if (analysis.is_wordpress) {
-    parts.push("é feito em WordPress, o que costuma deixar mais lento e mais vulnerável que um site sob medida");
+    parts.push("é feito em WordPress, o que costuma pesar mais e abrir brechas de segurança");
   }
 
   if (parts.length === 0) return "tem alguns pontos que dava pra melhorar";

@@ -20,7 +20,7 @@ async function fetchLatestAnalysisByLead(leadIds: string[]): Promise<Map<string,
 
   const { data: analyses } = await supabase
     .from("site_analysis")
-    .select("lead_id, performance_score, is_slow, is_outdated, is_wordpress, analyzed_at")
+    .select("lead_id, performance_score, is_slow, is_outdated, is_wordpress, notes, analyzed_at")
     .in("lead_id", leadIds)
     .order("analyzed_at", { ascending: false });
 
