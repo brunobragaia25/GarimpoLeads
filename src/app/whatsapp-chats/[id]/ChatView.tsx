@@ -2,7 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Bot, BotOff, Check, CheckCheck, CheckSquare, Loader2, Send, Square, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Bot,
+  BotOff,
+  Check,
+  CheckCheck,
+  CheckSquare,
+  Loader2,
+  Send,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react";
 import type { WhatsappConversationDetail } from "@/lib/whatsapp-chats";
 
 // Tiques ao estilo WhatsApp: 1 cinza = enviado, 2 cinza = entregue,
@@ -14,6 +26,49 @@ function DeliveryTicks({ status }: { status: string | null }) {
   if (status === "read") return <CheckCheck className="h-3 w-3 text-sky-300" />;
   if (status === "failed") return <span className="text-red-300">!</span>;
   return null;
+}
+
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+// Regex separada (sem "g") so pra testar - reusar a mesma instancia global
+// no .test() dentro do map mantém lastIndex entre chamadas e da resultado
+// errado a cada segunda checagem.
+const URL_TEST = /^https?:\/\/[^\s]+$/;
+// Sem "g" e sem ancoras - usada com .match() pra achar o primeiro link
+// dentro do texto ainda sendo digitado (que pode ter mais coisa em volta).
+const URL_TEST_ANY = /https?:\/\/[^\s]+/;
+
+interface LinkPreview {
+  url: string;
+  title: string | null;
+  description: string | null;
+  image: string | null;
+  siteName: string | null;
+}
+
+// Detecta link no texto e renderiza como <a> clicavel, igual o WhatsApp real
+// - sem isso o link aparecia so como texto simples, sem jeito de abrir.
+function Linkified({ text }: { text: string }) {
+  const parts = text.split(URL_REGEX);
+  return (
+    <>
+      {parts.map((part, i) =>
+        URL_TEST.test(part) ? (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:opacity-80"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
 }
 
 function formatTime(iso: string): string {
@@ -36,7 +91,39 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [linkPreview, setLinkPreview] = useState<LinkPreview | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [dismissedPreviewUrl, setDismissedPreviewUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Acha o primeiro link no texto sendo digitado e busca a previa (titulo,
+  // descricao, imagem), igual o WhatsApp real mostra antes de mandar.
+  // Debounce de 500ms pra nao disparar uma busca a cada tecla.
+  useEffect(() => {
+    const match = message.match(URL_TEST_ANY);
+    const url = match?.[0] ?? null;
+
+    if (!url || url === dismissedPreviewUrl) {
+      setLinkPreview(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setLoadingPreview(true);
+      try {
+        const res = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`);
+        const data = await res.json();
+        setLinkPreview(data);
+      } catch {
+        setLinkPreview(null);
+      } finally {
+        setLoadingPreview(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [message, dismissedPreviewUrl]);
 
   function toggleSelected(messageId: string) {
     setSelectedIds((prev) => {
@@ -136,6 +223,9 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
     }
 
     setMessage("");
+    setLinkPreview(null);
+    setDismissedPreviewUrl(null);
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
     router.refresh();
   }
 
@@ -280,7 +370,9 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
                   : "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
               }`}
             >
-              <p className="whitespace-pre-wrap">{m.body}</p>
+              <p className="whitespace-pre-wrap">
+                <Linkified text={m.body} />
+              </p>
               <p
                 className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${
                   m.direction === "outbound" ? "text-emerald-100" : "text-zinc-400 dark:text-zinc-500"
@@ -323,23 +415,74 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
 
       <div className="border-t border-zinc-100 p-3 dark:border-zinc-900">
         {error && <p className="mb-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
-        <div className="flex items-center gap-2">
-          <input
+
+        {loadingPreview && (
+          <div className="mb-2 flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2.5 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+            Buscando prévia do link...
+          </div>
+        )}
+
+        {!loadingPreview && linkPreview && (linkPreview.title || linkPreview.image) && (
+          <div className="relative mb-2 flex overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
+            {linkPreview.image && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={linkPreview.image}
+                alt=""
+                className="h-20 w-20 shrink-0 object-cover"
+              />
+            )}
+            <div className="min-w-0 flex-1 p-2.5 pr-8">
+              {linkPreview.title && (
+                <p className="truncate text-xs font-semibold text-zinc-900 dark:text-zinc-50">
+                  {linkPreview.title}
+                </p>
+              )}
+              {linkPreview.description && (
+                <p className="mt-0.5 line-clamp-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  {linkPreview.description}
+                </p>
+              )}
+              <p className="mt-0.5 truncate text-[11px] text-zinc-400 dark:text-zinc-500">
+                {linkPreview.siteName ?? linkPreview.url}
+              </p>
+            </div>
+            <button
+              onClick={() => setDismissedPreviewUrl(linkPreview.url)}
+              title="Remover prévia"
+              className="absolute right-1.5 top-1.5 rounded-full bg-black/10 p-1 text-zinc-600 hover:bg-black/20 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-end gap-2">
+          <textarea
+            ref={textareaRef}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              const el = e.target;
+              el.style.height = "auto";
+              el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 handleSend();
               }
+              // Shift+Enter deixa o comportamento padrao (quebra de linha).
             }}
-            placeholder="Digite uma mensagem manual... (pausa a IA nessa conversa)"
-            className="flex-1 rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+            rows={1}
+            placeholder="Digite uma mensagem manual... (Shift+Enter pra quebrar linha - pausa a IA nessa conversa)"
+            className="max-h-[120px] flex-1 resize-none rounded-2xl border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
           />
           <button
             onClick={handleSend}
             disabled={sending || !message.trim()}
-            className="inline-flex items-center justify-center rounded-full bg-emerald-600 p-2.5 text-white hover:bg-emerald-700 disabled:opacity-50"
+            className="inline-flex shrink-0 items-center justify-center rounded-full bg-emerald-600 p-2.5 text-white hover:bg-emerald-700 disabled:opacity-50"
           >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>
