@@ -36,6 +36,50 @@ const BOT_REPLY_PATTERNS = [
   "selecione uma das opcoes",
   "para ser redirecionado",
   "departamento desejado",
+  // Saudacao automatica de boas-vindas (muito comum em bot de atendimento
+  // corporativo - vem antes ou junto do menu numerado, as vezes sozinha).
+  "bem-vindo",
+  "bem vindo",
+  "seja bem-vindo",
+  "seja bem vindo",
+  // Frases genericas de "recebemos sua mensagem" / "aguarde" tipicas de
+  // autoresponder corporativo, sem citar explicitamente que e automatico.
+  "obrigado por entrar em contato",
+  "obrigada por entrar em contato",
+  "agradecemos o contato",
+  "recebemos sua mensagem",
+  "em breve um de nossos atendentes",
+  "em breve um atendente",
+  "em breve iremos retornar",
+  "iremos retornar em breve",
+  "sua mensagem e muito importante",
+  "sua mensagem é muito importante",
+  "aguarde que iremos",
+  "por favor aguarde",
+  "nosso horario de atendimento e",
+  "nosso horario de funcionamento e",
+  "este numero nao recebe",
+  "este numero e apenas para envio",
+  "canal automatico",
+  "central de atendimento",
+  // Saudacao automatica tipo clinica/consultorio: "[Nome] agradece seu
+  // contato... poderia nos informar seu nome... ja conhece nossa pagina
+  // do instagram" - fluxo de intake classico de bot, sem se identificar
+  // como automatico em nenhum momento.
+  "agradece seu contato",
+  "agradece o seu contato",
+  "agradece pelo contato",
+  "estamos felizes em te atender",
+  "ficamos felizes em atender",
+  "feliz em te atender",
+  "poderia nos informar seu nome",
+  "poderia informar seu nome",
+  "para iniciarmos o seu atendimento",
+  "para iniciarmos seu atendimento",
+  "ja iremos te responder",
+  "ja iremos responder",
+  "ja conhece nossa pagina",
+  "conheca nossa pagina do instagram",
 ];
 
 // Heuristica estrutural complementar: menu de atendimento automatico quase
