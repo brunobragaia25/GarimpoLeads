@@ -14,6 +14,8 @@ export interface WhatsappConversationSummary {
   hasReplied: boolean;
   isPinned: boolean;
   isFavorited: boolean;
+  needsHandoff: boolean;
+  handoffReason: string | null;
 }
 
 export interface WhatsappChatMessage {
@@ -31,6 +33,8 @@ export interface WhatsappConversationDetail {
   phone: string;
   status: string;
   aiEnabled: boolean;
+  needsHandoff: boolean;
+  handoffReason: string | null;
   messages: WhatsappChatMessage[];
 }
 
@@ -41,7 +45,7 @@ export const getWhatsappConversations = cache(async (): Promise<WhatsappConversa
   const { data: conversations, error } = await supabase
     .from("whatsapp_conversations")
     .select(
-      "id, phone, status, ai_enabled, lead_id, last_inbound_at, last_read_at, pinned_at, favorited_at, leads(name, category)"
+      "id, phone, status, ai_enabled, lead_id, last_inbound_at, last_read_at, pinned_at, favorited_at, needs_handoff, handoff_reason, leads(name, category)"
     )
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
@@ -85,6 +89,8 @@ export const getWhatsappConversations = cache(async (): Promise<WhatsappConversa
       hasReplied: !!c.last_inbound_at,
       isPinned: !!c.pinned_at,
       isFavorited: !!c.favorited_at,
+      needsHandoff: !!c.needs_handoff,
+      handoffReason: c.handoff_reason,
       pinnedAt: c.pinned_at,
     };
   });
@@ -114,7 +120,7 @@ export async function getWhatsappConversationDetail(
 
   const { data: conversation, error } = await supabase
     .from("whatsapp_conversations")
-    .select("id, phone, status, ai_enabled, leads(name, category, address)")
+    .select("id, phone, status, ai_enabled, needs_handoff, handoff_reason, leads(name, category, address)")
     .eq("id", id)
     .is("deleted_at", null)
     .maybeSingle();
@@ -138,6 +144,8 @@ export async function getWhatsappConversationDetail(
     phone: conversation.phone,
     status: conversation.status,
     aiEnabled: conversation.ai_enabled,
+    needsHandoff: conversation.needs_handoff,
+    handoffReason: conversation.handoff_reason,
     messages: (messages ?? []).map((m) => ({
       id: m.id,
       direction: m.direction as "inbound" | "outbound",

@@ -104,6 +104,8 @@ create table if not exists whatsapp_conversations (
   -- reenviar template pro mesmo lead nem perder a contagem de envios do dia
   pinned_at timestamptz, -- conversa fixada no topo da lista, igual WhatsApp
   favorited_at timestamptz, -- conversa favoritada, pra filtrar so as favoritas
+  needs_handoff boolean not null default false, -- IA marcou que essa conversa precisa do Bruno
+  handoff_reason text, -- motivo curto (reuniao, contrato, reclamacao, etc.)
   status text not null default 'template_sent', -- template_sent | open | closed
   ai_enabled boolean not null default true, -- false depois que o humano manda mensagem manual
   created_at timestamptz not null default now()

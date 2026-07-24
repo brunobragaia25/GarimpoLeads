@@ -190,6 +190,13 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
         </button>
       </div>
 
+      {conversation.needsHandoff && (
+        <div className="flex items-center gap-2 border-b border-orange-200 bg-orange-50 px-4 py-2 text-xs font-medium text-orange-800 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-300">
+          🔥 A IA sinalizou que essa conversa precisa de você
+          {conversation.handoffReason ? `: ${conversation.handoffReason}` : ""}
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50 px-4 py-2 dark:border-zinc-900 dark:bg-zinc-900/50">
         <button
           onClick={toggleSelectAll}

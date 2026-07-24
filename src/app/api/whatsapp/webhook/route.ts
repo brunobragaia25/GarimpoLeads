@@ -258,7 +258,14 @@ async function handleIncomingMessage(from: string, waMessageId: string, body: st
     });
     await supabase
       .from("whatsapp_conversations")
-      .update({ last_outbound_at: now, status: "open" })
+      .update({
+        last_outbound_at: now,
+        status: "open",
+        // Persiste o sinal de handoff (nao so o aviso do Telegram, que se
+        // perde no meio de outras mensagens) - fica visivel na lista de
+        // chats ate o Bruno assumir a conversa manualmente.
+        ...(reply.needsHandoff ? { needs_handoff: true, handoff_reason: reply.handoffReason } : {}),
+      })
       .eq("id", conversation.id);
 
     // Handoff: a IA avaliou que essa conversa precisa da atencao do Bruno

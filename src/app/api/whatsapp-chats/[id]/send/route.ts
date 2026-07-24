@@ -54,6 +54,9 @@ export async function POST(
         last_outbound_at: new Date().toISOString(),
         status: "open",
         ai_enabled: false,
+        // Mandar mensagem manual = o Bruno assumiu a conversa, entao o
+        // sinal de "precisa de atencao" ja foi atendido.
+        needs_handoff: false,
       })
       .eq("id", conversation.id);
 
