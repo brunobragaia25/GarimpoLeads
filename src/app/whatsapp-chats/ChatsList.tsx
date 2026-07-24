@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bot, BotOff, CheckSquare, Loader2, Pin, Square, Star, Trash2 } from "lucide-react";
+import { Bot, BotOff, CheckSquare, Loader2, MessageCircleReply, Pin, Square, Star, Trash2 } from "lucide-react";
 import { DeleteConversationButton } from "./DeleteConversationButton";
 import type { WhatsappConversationSummary } from "@/lib/whatsapp-chats";
 
@@ -29,11 +29,15 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
   const pathname = usePathname();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [filter, setFilter] = useState<"all" | "favorites">("all");
+  const [filter, setFilter] = useState<"all" | "favorites" | "replied">("all");
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const visibleConversations =
-    filter === "favorites" ? conversations.filter((c) => c.isFavorited) : conversations;
+    filter === "favorites"
+      ? conversations.filter((c) => c.isFavorited)
+      : filter === "replied"
+        ? conversations.filter((c) => c.hasReplied)
+        : conversations;
 
   async function handleTogglePin(e: React.MouseEvent, c: WhatsappConversationSummary) {
     e.preventDefault();
@@ -129,6 +133,17 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
           <Star className="h-3 w-3" />
           Favoritas
         </button>
+        <button
+          onClick={() => setFilter("replied")}
+          className={`inline-flex items-center gap-1 rounded-t-md px-3 py-1.5 text-xs font-medium ${
+            filter === "replied"
+              ? "bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50"
+              : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+          }`}
+        >
+          <MessageCircleReply className="h-3 w-3" />
+          Respondidas
+        </button>
       </div>
 
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950">
@@ -159,7 +174,11 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
 
       {visibleConversations.length === 0 ? (
         <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          Nenhuma conversa favoritada ainda.
+          {filter === "favorites"
+            ? "Nenhuma conversa favoritada ainda."
+            : filter === "replied"
+              ? "Nenhuma conversa respondida ainda."
+              : "Nenhuma conversa de WhatsApp ainda."}
         </div>
       ) : (
       <div className="flex-1 divide-y divide-zinc-100 overflow-y-auto dark:divide-zinc-900">

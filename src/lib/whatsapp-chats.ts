@@ -11,6 +11,7 @@ export interface WhatsappConversationSummary {
   lastMessageBody: string | null;
   lastMessageAt: string | null;
   hasUnread: boolean;
+  hasReplied: boolean;
   isPinned: boolean;
   isFavorited: boolean;
 }
@@ -81,6 +82,7 @@ export const getWhatsappConversations = cache(async (): Promise<WhatsappConversa
       lastMessageBody: last?.body ?? null,
       lastMessageAt: last?.created_at ?? null,
       hasUnread,
+      hasReplied: !!c.last_inbound_at,
       isPinned: !!c.pinned_at,
       isFavorited: !!c.favorited_at,
       pinnedAt: c.pinned_at,
