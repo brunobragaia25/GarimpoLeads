@@ -106,6 +106,7 @@ create table if not exists whatsapp_conversations (
   favorited_at timestamptz, -- conversa favoritada, pra filtrar so as favoritas
   needs_handoff boolean not null default false, -- IA marcou que essa conversa precisa do Bruno
   handoff_reason text, -- motivo curto (reuniao, contrato, reclamacao, etc.)
+  archived_at timestamptz, -- arquivada: some da lista "Todas", mas fica na aba "Arquivadas"
   status text not null default 'template_sent', -- template_sent | open | closed
   ai_enabled boolean not null default true, -- false depois que o humano manda mensagem manual
   created_at timestamptz not null default now()
@@ -119,6 +120,7 @@ create table if not exists whatsapp_messages (
   direction text not null, -- inbound | outbound
   body text not null,
   wa_message_id text,
+  delivery_status text, -- sent | delivered | read | failed (so pra outbound, via webhook de status da Meta)
   created_at timestamptz not null default now()
 );
 

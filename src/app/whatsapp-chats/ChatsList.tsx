@@ -3,7 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bot, BotOff, CheckSquare, Loader2, MessageCircleReply, Pin, Square, Star, Trash2 } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  Bot,
+  BotOff,
+  CheckSquare,
+  Loader2,
+  MessageCircleReply,
+  Pin,
+  Search,
+  Square,
+  Star,
+  Trash2,
+} from "lucide-react";
 import { DeleteConversationButton } from "./DeleteConversationButton";
 import type { WhatsappConversationSummary } from "@/lib/whatsapp-chats";
 
@@ -29,15 +42,41 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
   const pathname = usePathname();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [filter, setFilter] = useState<"all" | "favorites" | "replied">("all");
+  const [filter, setFilter] = useState<"all" | "favorites" | "replied" | "unread" | "archived">("all");
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
-  const visibleConversations =
-    filter === "favorites"
-      ? conversations.filter((c) => c.isFavorited)
-      : filter === "replied"
-        ? conversations.filter((c) => c.hasReplied)
-        : conversations;
+  // "Arquivadas" e uma gaveta separada - some das outras abas, so aparece
+  // aqui. As demais abas (Todas/Favoritas/Respondidas/Nao lidas) nunca
+  // mostram conversa arquivada, igual WhatsApp.
+  const filteredByTab =
+    filter === "archived"
+      ? conversations.filter((c) => c.isArchived)
+      : conversations
+          .filter((c) => !c.isArchived)
+          .filter((c) => {
+            if (filter === "favorites") return c.isFavorited;
+            if (filter === "replied") return c.hasReplied;
+            if (filter === "unread") return c.hasUnread;
+            return true;
+          });
+
+  const visibleConversations = search.trim()
+    ? filteredByTab.filter((c) => c.leadName.toLowerCase().includes(search.trim().toLowerCase()))
+    : filteredByTab;
+
+  async function handleToggleArchive(e: React.MouseEvent, c: WhatsappConversationSummary) {
+    e.preventDefault();
+    e.stopPropagation();
+    setTogglingId(c.id);
+    await fetch(`/api/whatsapp-chats/${c.id}/archive`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived: !c.isArchived }),
+    });
+    setTogglingId(null);
+    router.refresh();
+  }
 
   async function handleTogglePin(e: React.MouseEvent, c: WhatsappConversationSummary) {
     e.preventDefault();
@@ -111,10 +150,10 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center gap-1 border-b border-zinc-200 bg-zinc-50 px-3 pt-2 dark:border-zinc-800 dark:bg-zinc-900/50">
+      <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-zinc-200 bg-zinc-50 px-3 pt-2 dark:border-zinc-800 dark:bg-zinc-900/50">
         <button
           onClick={() => setFilter("all")}
-          className={`rounded-t-md px-3 py-1.5 text-xs font-medium ${
+          className={`shrink-0 rounded-t-md px-3 py-1.5 text-xs font-medium ${
             filter === "all"
               ? "bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50"
               : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
@@ -123,8 +162,19 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
           Todas
         </button>
         <button
+          onClick={() => setFilter("unread")}
+          className={`inline-flex shrink-0 items-center gap-1 rounded-t-md px-3 py-1.5 text-xs font-medium ${
+            filter === "unread"
+              ? "bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50"
+              : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+          }`}
+        >
+          <span className="h-2 w-2 rounded-full bg-red-500" />
+          Não lidas
+        </button>
+        <button
           onClick={() => setFilter("favorites")}
-          className={`inline-flex items-center gap-1 rounded-t-md px-3 py-1.5 text-xs font-medium ${
+          className={`inline-flex shrink-0 items-center gap-1 rounded-t-md px-3 py-1.5 text-xs font-medium ${
             filter === "favorites"
               ? "bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50"
               : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
@@ -135,7 +185,7 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
         </button>
         <button
           onClick={() => setFilter("replied")}
-          className={`inline-flex items-center gap-1 rounded-t-md px-3 py-1.5 text-xs font-medium ${
+          className={`inline-flex shrink-0 items-center gap-1 rounded-t-md px-3 py-1.5 text-xs font-medium ${
             filter === "replied"
               ? "bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50"
               : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
@@ -144,6 +194,29 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
           <MessageCircleReply className="h-3 w-3" />
           Respondidas
         </button>
+        <button
+          onClick={() => setFilter("archived")}
+          className={`inline-flex shrink-0 items-center gap-1 rounded-t-md px-3 py-1.5 text-xs font-medium ${
+            filter === "archived"
+              ? "bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50"
+              : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+          }`}
+        >
+          <Archive className="h-3 w-3" />
+          Arquivadas
+        </button>
+      </div>
+
+      <div className="shrink-0 border-b border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar conversa..."
+            className="w-full rounded-md border border-zinc-200 bg-zinc-50 py-1.5 pl-8 pr-2 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+          />
+        </div>
       </div>
 
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950">
@@ -174,11 +247,17 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
 
       {visibleConversations.length === 0 ? (
         <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          {filter === "favorites"
-            ? "Nenhuma conversa favoritada ainda."
-            : filter === "replied"
-              ? "Nenhuma conversa respondida ainda."
-              : "Nenhuma conversa de WhatsApp ainda."}
+          {search.trim()
+            ? "Nenhuma conversa encontrada."
+            : filter === "favorites"
+              ? "Nenhuma conversa favoritada ainda."
+              : filter === "replied"
+                ? "Nenhuma conversa respondida ainda."
+                : filter === "unread"
+                  ? "Nenhuma conversa não lida."
+                  : filter === "archived"
+                    ? "Nenhuma conversa arquivada."
+                    : "Nenhuma conversa de WhatsApp ainda."}
         </div>
       ) : (
       <div className="flex-1 divide-y divide-zinc-100 overflow-y-auto dark:divide-zinc-900">
@@ -270,6 +349,14 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
                 className="shrink-0 rounded-md p-1 text-zinc-400 hover:text-zinc-700 disabled:opacity-50 dark:text-zinc-500 dark:hover:text-zinc-200"
               >
                 <Pin className={`h-4 w-4 ${c.isPinned ? "fill-zinc-500 text-zinc-500 dark:fill-zinc-300 dark:text-zinc-300" : ""}`} />
+              </button>
+              <button
+                onClick={(e) => handleToggleArchive(e, c)}
+                disabled={togglingId === c.id}
+                title={c.isArchived ? "Desarquivar conversa" : "Arquivar conversa"}
+                className="shrink-0 rounded-md p-1 text-zinc-400 hover:text-zinc-700 disabled:opacity-50 dark:text-zinc-500 dark:hover:text-zinc-200"
+              >
+                {c.isArchived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
               </button>
               <DeleteConversationButton id={c.id} name={c.leadName} />
             </Link>

@@ -6,6 +6,7 @@ import { generateWhatsappReply } from "@/lib/whatsapp-ai";
 import { logAiUsage } from "@/lib/ai-usage";
 import { detectNegativeIntent } from "@/lib/negative-intent";
 import { detectBotReply } from "@/lib/bot-reply-detection";
+import { updateMessageDeliveryStatus } from "@/lib/whatsapp-chats";
 import { notifyTelegram } from "@/lib/telegram";
 
 const CLOSING_MESSAGE =
@@ -35,6 +36,10 @@ interface WhatsappWebhookPayload {
           id: string;
           type: string;
           text?: { body: string };
+        }>;
+        statuses?: Array<{
+          id: string;
+          status: string;
         }>;
       };
     }>;
@@ -301,7 +306,8 @@ export async function POST(req: NextRequest) {
 
   // A Meta so espera 200 de volta pra parar de reentregar o evento -
   // processa cada mensagem de texto recebida, ignorando outros tipos
-  // (imagem, audio, status de entrega/leitura, etc.) por enquanto.
+  // (imagem, audio, etc.) por enquanto, alem dos status de entrega/leitura
+  // das mensagens que a gente mandou (sent/delivered/read/failed).
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
       const contacts = change.value?.contacts ?? [];
@@ -313,6 +319,14 @@ export async function POST(req: NextRequest) {
           } catch (err) {
             console.error("Erro processando mensagem do WhatsApp:", err);
           }
+        }
+      }
+
+      for (const statusUpdate of change.value?.statuses ?? []) {
+        try {
+          await updateMessageDeliveryStatus(statusUpdate.id, statusUpdate.status);
+        } catch (err) {
+          console.error("Erro atualizando status de entrega do WhatsApp:", err);
         }
       }
     }

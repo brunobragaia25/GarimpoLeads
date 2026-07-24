@@ -16,6 +16,7 @@ export interface WhatsappConversationSummary {
   isFavorited: boolean;
   needsHandoff: boolean;
   handoffReason: string | null;
+  isArchived: boolean;
 }
 
 export interface WhatsappChatMessage {
@@ -23,6 +24,7 @@ export interface WhatsappChatMessage {
   direction: "inbound" | "outbound";
   body: string;
   createdAt: string;
+  deliveryStatus: string | null;
 }
 
 export interface WhatsappConversationDetail {
@@ -45,7 +47,7 @@ export const getWhatsappConversations = cache(async (): Promise<WhatsappConversa
   const { data: conversations, error } = await supabase
     .from("whatsapp_conversations")
     .select(
-      "id, phone, status, ai_enabled, lead_id, last_inbound_at, last_read_at, pinned_at, favorited_at, needs_handoff, handoff_reason, leads(name, category)"
+      "id, phone, status, ai_enabled, lead_id, last_inbound_at, last_read_at, pinned_at, favorited_at, needs_handoff, handoff_reason, archived_at, created_at, leads(name, category)"
     )
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
@@ -91,12 +93,18 @@ export const getWhatsappConversations = cache(async (): Promise<WhatsappConversa
       isFavorited: !!c.favorited_at,
       needsHandoff: !!c.needs_handoff,
       handoffReason: c.handoff_reason,
+      isArchived: !!c.archived_at,
       pinnedAt: c.pinned_at,
+      // So pra ordenar por ultima atividade - conversa nova sem mensagem
+      // ainda cai pra data de criacao.
+      activityAt: last?.created_at ?? c.created_at,
     };
   });
 
   // Fixadas sempre no topo (mais recentemente fixada primeiro), igual
-  // WhatsApp - o resto mantem a ordem por data de criacao ja aplicada na query.
+  // WhatsApp. O resto ordena por ultima atividade (mensagem mais recente,
+  // enviada ou recebida) - assim quem responde sobe pro topo da lista, em
+  // vez de ficar preso na posicao de quando a conversa foi criada.
   return summaries
     .sort((a, b) => {
       if (a.isPinned && b.isPinned) {
@@ -104,9 +112,9 @@ export const getWhatsappConversations = cache(async (): Promise<WhatsappConversa
       }
       if (a.isPinned) return -1;
       if (b.isPinned) return 1;
-      return 0;
+      return new Date(b.activityAt).getTime() - new Date(a.activityAt).getTime();
     })
-    .map(({ pinnedAt: _pinnedAt, ...rest }) => rest);
+    .map(({ pinnedAt: _pinnedAt, activityAt: _activityAt, ...rest }) => rest);
 });
 
 export async function getWhatsappConversationDetail(
@@ -131,7 +139,7 @@ export async function getWhatsappConversationDetail(
 
   const { data: messages, error: messagesError } = await supabase
     .from("whatsapp_messages")
-    .select("id, direction, body, created_at")
+    .select("id, direction, body, created_at, delivery_status")
     .eq("conversation_id", id)
     .order("created_at", { ascending: true });
   if (messagesError) throw new Error(messagesError.message);
@@ -151,6 +159,7 @@ export async function getWhatsappConversationDetail(
       direction: m.direction as "inbound" | "outbound",
       body: m.body,
       createdAt: m.created_at,
+      deliveryStatus: m.delivery_status,
     })),
   };
 }
@@ -178,6 +187,43 @@ export async function setConversationFavorited(id: string, favorited: boolean): 
     .from("whatsapp_conversations")
     .update({ favorited_at: favorited ? new Date().toISOString() : null })
     .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function setConversationArchived(id: string, archived: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("whatsapp_conversations")
+    .update({ archived_at: archived ? new Date().toISOString() : null })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// Atualiza o status de entrega (sent/delivered/read/failed) de uma mensagem
+// enviada, a partir do webhook de status da Meta. So regride com cuidado:
+// nao sobrescreve "read" com "delivered" se um evento atrasado chegar fora
+// de ordem (a Meta as vezes reentrega eventos).
+const STATUS_RANK: Record<string, number> = { sent: 1, delivered: 2, read: 3, failed: 1 };
+
+export async function updateMessageDeliveryStatus(
+  waMessageId: string,
+  status: string
+): Promise<void> {
+  const { data: existing } = await supabase
+    .from("whatsapp_messages")
+    .select("id, delivery_status")
+    .eq("wa_message_id", waMessageId)
+    .maybeSingle();
+
+  if (!existing) return;
+
+  const currentRank = existing.delivery_status ? (STATUS_RANK[existing.delivery_status] ?? 0) : 0;
+  const newRank = STATUS_RANK[status] ?? 0;
+  if (newRank < currentRank) return;
+
+  const { error } = await supabase
+    .from("whatsapp_messages")
+    .update({ delivery_status: status })
+    .eq("id", existing.id);
   if (error) throw new Error(error.message);
 }
 

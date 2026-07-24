@@ -2,8 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Bot, BotOff, CheckSquare, Loader2, Send, Square, Trash2 } from "lucide-react";
+import { ArrowLeft, Bot, BotOff, Check, CheckCheck, CheckSquare, Loader2, Send, Square, Trash2 } from "lucide-react";
 import type { WhatsappConversationDetail } from "@/lib/whatsapp-chats";
+
+// Tiques ao estilo WhatsApp: 1 cinza = enviado, 2 cinza = entregue,
+// 2 azul = lido. Sem status ainda (null) nao mostra nada, evita
+// afirmar "enviado" antes da Meta confirmar de verdade.
+function DeliveryTicks({ status }: { status: string | null }) {
+  if (status === "sent") return <Check className="h-3 w-3" />;
+  if (status === "delivered") return <CheckCheck className="h-3 w-3" />;
+  if (status === "read") return <CheckCheck className="h-3 w-3 text-sky-300" />;
+  if (status === "failed") return <span className="text-red-300">!</span>;
+  return null;
+}
 
 function formatTime(iso: string): string {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -271,11 +282,12 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
             >
               <p className="whitespace-pre-wrap">{m.body}</p>
               <p
-                className={`mt-1 text-right text-[10px] ${
+                className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${
                   m.direction === "outbound" ? "text-emerald-100" : "text-zinc-400 dark:text-zinc-500"
                 }`}
               >
                 {formatTime(m.createdAt)}
+                {m.direction === "outbound" && <DeliveryTicks status={m.deliveryStatus} />}
               </p>
             </div>
             {m.direction === "inbound" && (
