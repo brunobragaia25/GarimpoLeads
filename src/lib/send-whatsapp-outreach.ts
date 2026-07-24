@@ -87,7 +87,7 @@ async function countTemplatesSentToday(): Promise<number> {
 // pra leads elegiveis com WhatsApp que ainda nao tem conversa iniciada.
 // Espelha a estrutura de sendPendingOutreach em send-outreach.ts, mas pro
 // canal WhatsApp em vez de email.
-export async function sendPendingWhatsappTemplates(limit = 20) {
+export async function sendPendingWhatsappTemplates(limit = 20, deadline = Infinity) {
   const dailyLimit = Number(process.env.WHATSAPP_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
   const alreadySentToday = await countTemplatesSentToday();
   const remainingToday = Math.max(0, dailyLimit - alreadySentToday);
@@ -138,6 +138,13 @@ export async function sendPendingWhatsappTemplates(limit = 20) {
   let failed = 0;
 
   for (const lead of pending) {
+    // Checa a cada mensagem, nao so antes de comecar o loop - sem isso, se
+    // muitos envios demorarem (mesmo com timeout por chamada), a soma pode
+    // estourar o limite de execucao da Vercel antes de terminar o lote
+    // inteiro, matando a funcao sem nunca gravar o log final. O resto fica
+    // pro proximo cron (agora 2x/dia).
+    if (Date.now() > deadline) break;
+
     const hasWebsite = !!lead.website;
     const templateName = hasWebsite
       ? process.env.WHATSAPP_TEMPLATE_HAS_SITE_NAME!
@@ -197,7 +204,7 @@ export async function sendPendingWhatsappTemplates(limit = 20) {
 // Follow-up pra quem recebeu o template inicial ha X dias e nunca respondeu
 // nada (last_inbound_at continua null) - reabre a janela de 24h com outro
 // template pago, ja que texto livre so funciona depois que o lead responde.
-export async function sendPendingWhatsappFollowUps(daysThreshold = 5, limit = 20) {
+export async function sendPendingWhatsappFollowUps(daysThreshold = 5, limit = 20, deadline = Infinity) {
   const dailyLimit = Number(process.env.WHATSAPP_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
   const alreadySentToday = await countTemplatesSentToday();
   const remainingToday = Math.max(0, dailyLimit - alreadySentToday);
@@ -227,6 +234,8 @@ export async function sendPendingWhatsappFollowUps(daysThreshold = 5, limit = 20
   let failed = 0;
 
   for (const row of rows ?? []) {
+    if (Date.now() > deadline) break;
+
     const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads;
     if (!lead) continue;
 

@@ -34,13 +34,16 @@ const EMAIL_SEND_LIMIT_PER_DAY = 100;
 const FOLLOWUP_DAYS_THRESHOLD = 5;
 const FOLLOWUP_LIMIT_PER_DAY = 20;
 
-// Disparo de template WhatsApp (Meta) pros leads elegiveis; a IA responde
-// via webhook separado quando o lead responder, fora deste cron.
-const WHATSAPP_TEMPLATES_LIMIT_PER_DAY = 20;
+// Limite passado aqui pra cada chamada individual - o teto de verdade do dia
+// e o env var (WHATSAPP_DAILY_LIMIT), aplicado internamente em
+// sendPendingWhatsappTemplates via Math.min. Esse numero soh precisa ser
+// alto o suficiente pra nao virar ele mesmo o gargalo agora que rodam 2
+// crons/dia - por isso segue igual ao teto diario total, nao 20 fixo.
+const WHATSAPP_TEMPLATES_LIMIT_PER_DAY = 100;
 
 // Follow-up automatico pra quem recebeu o template inicial e nunca respondeu.
 const WHATSAPP_FOLLOWUP_DAYS_THRESHOLD = 5;
-const WHATSAPP_FOLLOWUP_LIMIT_PER_DAY = 20;
+const WHATSAPP_FOLLOWUP_LIMIT_PER_DAY = 100;
 
 function isAuthorized(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
@@ -63,6 +66,9 @@ export async function GET(req: NextRequest) {
   let pairs: { category: string; location: string }[] = [];
 
   const timeLeft = () => TIME_BUDGET_MS - (Date.now() - startedAt);
+  // Prazo absoluto (epoch ms) pra passar pros loops de envio - eles checam
+  // isso a cada mensagem, nao so o timeLeft() antes de comecar.
+  const deadline = startedAt + TIME_BUDGET_MS;
 
   // Tudo dentro de um try/catch geral: se qualquer etapa (mesmo fora do
   // loop) lançar uma exceção não prevista, ainda assim conseguimos gravar
@@ -114,7 +120,7 @@ export async function GET(req: NextRequest) {
 
     if (timeLeft() > 10_000) {
       try {
-        const outreachResult = await sendPendingOutreach(EMAIL_SEND_LIMIT_PER_DAY);
+        const outreachResult = await sendPendingOutreach(EMAIL_SEND_LIMIT_PER_DAY, undefined, deadline);
         emailsSent = outreachResult.sent;
       } catch (err) {
         const message = err instanceof Error ? err.message : "erro desconhecido";
@@ -126,7 +132,7 @@ export async function GET(req: NextRequest) {
 
     if (timeLeft() > 10_000) {
       try {
-        const followUpResult = await sendFollowUps(FOLLOWUP_DAYS_THRESHOLD, FOLLOWUP_LIMIT_PER_DAY);
+        const followUpResult = await sendFollowUps(FOLLOWUP_DAYS_THRESHOLD, FOLLOWUP_LIMIT_PER_DAY, deadline);
         followUpsSent = followUpResult.sent;
       } catch (err) {
         const message = err instanceof Error ? err.message : "erro desconhecido";
@@ -138,7 +144,7 @@ export async function GET(req: NextRequest) {
 
     if (timeLeft() > 10_000) {
       try {
-        const whatsappResult = await sendPendingWhatsappTemplates(WHATSAPP_TEMPLATES_LIMIT_PER_DAY);
+        const whatsappResult = await sendPendingWhatsappTemplates(WHATSAPP_TEMPLATES_LIMIT_PER_DAY, deadline);
         whatsappTemplatesSent = whatsappResult.sent;
       } catch (err) {
         const message = err instanceof Error ? err.message : "erro desconhecido";
@@ -152,7 +158,8 @@ export async function GET(req: NextRequest) {
       try {
         const whatsappFollowUpResult = await sendPendingWhatsappFollowUps(
           WHATSAPP_FOLLOWUP_DAYS_THRESHOLD,
-          WHATSAPP_FOLLOWUP_LIMIT_PER_DAY
+          WHATSAPP_FOLLOWUP_LIMIT_PER_DAY,
+          deadline
         );
         whatsappFollowUpsSent = whatsappFollowUpResult.sent;
       } catch (err) {

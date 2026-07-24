@@ -23,6 +23,9 @@ export async function findEmailForWebsite(website: string): Promise<EmailResult>
       api_key: process.env.HUNTER_API_KEY,
       limit: 10,
     },
+    // Sem isso, uma chamada travada prende a funcao do cron ate o limite de
+    // 300s da Vercel matar ela sem gravar o log final.
+    timeout: 15_000,
   });
 
   const emails: Array<{ value: string; type: string; confidence: number }> =

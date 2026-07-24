@@ -83,7 +83,7 @@ function appendUnsubscribeFooter(body: string, link: string): string {
   return `${body}\n\n---\nSe não quiser mais receber esses emails, clique aqui: ${link}`;
 }
 
-export async function sendPendingOutreach(limit = 100, leadId?: string) {
+export async function sendPendingOutreach(limit = 100, leadId?: string, deadline = Infinity) {
   const resolveTemplate = await buildTemplateResolver();
   const dailyLimit = Number(process.env.SEND_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
 
@@ -123,6 +123,11 @@ export async function sendPendingOutreach(limit = 100, leadId?: string) {
   let failed = 0;
 
   for (const row of rows ?? []) {
+    // Checa a cada email, nao so antes de comecar - protege contra a soma
+    // dos envios estourar o limite de execucao da funcao antes de terminar
+    // o lote (o resto fica pro proximo cron).
+    if (Date.now() > deadline) break;
+
     const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads;
     if (!lead || !row.email) continue;
 
@@ -166,7 +171,7 @@ export async function sendPendingOutreach(limit = 100, leadId?: string) {
 
 // Reenvia pra quem foi contatado há mais de `daysThreshold` dias e ainda não
 // recebeu follow-up. Compartilha a mesma cota diária dos envios iniciais.
-export async function sendFollowUps(daysThreshold = 5, limit = 20) {
+export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = Infinity) {
   const dailyLimit = Number(process.env.SEND_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
   const alreadySentToday = await countSentToday();
   const remainingToday = Math.max(0, dailyLimit - alreadySentToday);
@@ -197,6 +202,8 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20) {
   let failed = 0;
 
   for (const row of rows ?? []) {
+    if (Date.now() > deadline) break;
+
     const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads;
     if (!lead || !row.email) continue;
 

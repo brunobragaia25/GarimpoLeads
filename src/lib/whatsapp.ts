@@ -23,6 +23,11 @@ function authHeaders() {
   return { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` };
 }
 
+// Sem timeout, uma chamada travada na Meta prende a funcao inteira do cron
+// ate o limite de 300s da Vercel matar ela sem nunca gravar o log final -
+// foi exatamente isso que pareceu ter acontecido num dia real de execucao.
+const REQUEST_TIMEOUT_MS = 15_000;
+
 // Telefone precisa ir em E.164 sem "+" pra Graph API (ex: 5541999998888).
 // Exportado porque o webhook recebe o "from" nesse mesmo formato da Meta -
 // gravar a conversa já normalizada assim evita ter que casar formatos
@@ -67,7 +72,7 @@ export async function sendWhatsappTemplate(
               : undefined,
         },
       },
-      { headers: authHeaders() }
+      { headers: authHeaders(), timeout: REQUEST_TIMEOUT_MS }
     );
 
     return data.messages?.[0]?.id ?? "";
@@ -89,7 +94,7 @@ export async function sendWhatsappText(phone: string, body: string): Promise<str
         type: "text",
         text: { body },
       },
-      { headers: authHeaders() }
+      { headers: authHeaders(), timeout: REQUEST_TIMEOUT_MS }
     );
 
     return data.messages?.[0]?.id ?? "";

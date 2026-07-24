@@ -3,6 +3,10 @@ import { Lead } from "./types";
 
 const PLACES_BASE = "https://maps.googleapis.com/maps/api/place";
 
+// Sem timeout, uma chamada travada na API do Google prende a funcao inteira
+// do cron ate o limite de 300s da Vercel matar ela sem gravar o log final.
+const REQUEST_TIMEOUT_MS = 15_000;
+
 interface TextSearchResult {
   place_id: string;
   name: string;
@@ -22,6 +26,7 @@ async function textSearch(query: string): Promise<TextSearchResult[]> {
       key: process.env.GOOGLE_MAPS_API_KEY,
       language: "pt-BR",
     },
+    timeout: REQUEST_TIMEOUT_MS,
   });
 
   if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
@@ -39,6 +44,7 @@ async function placeDetails(placeId: string): Promise<PlaceDetails> {
       key: process.env.GOOGLE_MAPS_API_KEY,
       language: "pt-BR",
     },
+    timeout: REQUEST_TIMEOUT_MS,
   });
 
   if (data.status !== "OK") {
