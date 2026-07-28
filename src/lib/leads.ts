@@ -25,6 +25,7 @@ export interface LeadWithDetails {
   performance_score: number | null;
   is_outdated: boolean | null;
   is_slow: boolean | null;
+  site_notes: string | null;
   email: string | null;
   email_confidence: number | null;
   outreach_status: string | null;
@@ -89,6 +90,7 @@ export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
       performance_score: analysis?.performance_score ?? null,
       is_outdated: analysis?.is_outdated ?? null,
       is_slow: analysis?.is_slow ?? null,
+      site_notes: analysis?.notes ?? null,
       email: outreach?.email ?? null,
       email_confidence: outreach?.email_confidence ?? null,
       outreach_status: outreach?.status ?? null,

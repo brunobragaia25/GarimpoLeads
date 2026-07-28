@@ -16,7 +16,7 @@ import {
 } from "./LeadActions";
 import { PageHeader } from "./PageHeader";
 import { FilterForm } from "./FilterForm";
-import { getTemplate, getWhatsappNoSiteTemplate, renderTemplate } from "@/lib/template";
+import { buildProblemSummary, getTemplate, getWhatsappNoSiteTemplate, renderTemplate } from "@/lib/template";
 import { hasUsablePhone, isMobilePhone, whatsappLink } from "@/lib/phone";
 import {
   Users,
@@ -462,6 +462,13 @@ export default async function Home({
                         name: lead.name,
                         category: lead.category,
                         address: lead.address,
+                        problem: buildProblemSummary({
+                          performance_score: lead.performance_score,
+                          is_slow: lead.is_slow,
+                          is_outdated: lead.is_outdated,
+                          is_wordpress: lead.is_wordpress,
+                          notes: lead.site_notes,
+                        }),
                       }).body
                     : undefined;
                 const isLandline = !!lead.phone && !isMobilePhone(lead.phone);
