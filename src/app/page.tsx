@@ -258,6 +258,7 @@ export default async function Home({
       if (priorityOnly && !isPriorityProspect(lead)) return false;
       if (siteFilter === "with" && !lead.website) return false;
       if (siteFilter === "without" && lead.website) return false;
+      if (siteFilter === "broken" && !lead.is_broken) return false;
       if (
         sentDate &&
         toBrasiliaDateStr(lead.contacted_at) !== sentDate &&
@@ -467,6 +468,8 @@ export default async function Home({
                           is_slow: lead.is_slow,
                           is_outdated: lead.is_outdated,
                           is_wordpress: lead.is_wordpress,
+                          is_broken: lead.is_broken,
+                          broken_reason: lead.broken_reason,
                           notes: lead.site_notes,
                         }),
                       }).body
@@ -551,16 +554,27 @@ export default async function Home({
                           {lead.social_platform}
                         </a>
                       ) : lead.website ? (
-                        <a
-                          href={lead.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
-                        >
-                          <Globe className="h-3.5 w-3.5" />
-                          site
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
+                        <div className="flex items-center gap-1.5">
+                          <a
+                            href={lead.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            <Globe className="h-3.5 w-3.5" />
+                            site
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                          {lead.is_broken && (
+                            <span
+                              title={lead.broken_reason ?? "site fora do ar"}
+                              className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-400"
+                            >
+                              <AlertTriangle className="h-3 w-3" />
+                              fora do ar
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
                           <XCircle className="h-3.5 w-3.5" />

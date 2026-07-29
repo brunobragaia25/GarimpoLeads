@@ -1,9 +1,11 @@
 import { supabase } from "./supabase";
 import { sendWhatsappTemplate, toWhatsappPhone } from "./whatsapp";
-import { hasUsablePhone } from "./phone";
+import { isMobilePhone } from "./phone";
 import { detectSocialPlatform } from "./social-link";
 import { startOfTodayBrasiliaISO } from "./timezone";
 import { buildProblemSummary, type SiteAnalysisSummary } from "./template";
+import { fetchBlockedPhones } from "./blocklist";
+import { normalizePhone } from "./deduplication";
 
 // "com_site_v2" acrescenta uma 3a variavel ({{3}}) com o achado real da
 // analise do site (mesmo padrao ja usado no email) - "com_site_v1" so tem
@@ -18,7 +20,7 @@ async function fetchLatestAnalysisByLead(leadIds: string[]): Promise<Map<string,
 
   const { data: analyses } = await supabase
     .from("site_analysis")
-    .select("lead_id, performance_score, is_slow, is_outdated, is_wordpress, notes, analyzed_at")
+    .select("lead_id, performance_score, is_slow, is_outdated, is_wordpress, is_broken, broken_reason, notes, analyzed_at")
     .in("lead_id", leadIds)
     .order("analyzed_at", { ascending: false });
 
@@ -99,6 +101,11 @@ export async function sendPendingWhatsappTemplates(limit = 20, deadline = Infini
 
   const existingLeadIds = new Set(await fetchAllColumn("whatsapp_conversations", "lead_id"));
 
+  // Ultima trava contra reenvio: mesmo que um lead excluido tenha voltado
+  // com id novo (nao deveria mais, com o bloqueio em pipeline.ts), o
+  // telefone continua bloqueado pra sempre.
+  const blockedPhones = await fetchBlockedPhones();
+
   // Janela grande + filtro em memoria depois: mesmo padrao ja usado em
   // findPendingEmails/analyzePendingSites pra nao travar nos leads mais
   // antigos quando eles ja tiverem todos conversa iniciada.
@@ -117,10 +124,20 @@ export async function sendPendingWhatsappTemplates(limit = 20, deadline = Infini
     if (data.length < POSTGREST_PAGE_SIZE) break;
   }
 
+  // Usa isMobilePhone (estrito) em vez de hasUsablePhone (permissivo) aqui -
+  // dado real: 133 de 156 falhas de entrega eram numero com cara de fixo,
+  // que nunca vai ter WhatsApp. Cada tentativa nesses ocupa uma vaga da cota
+  // diaria fixa (100/dia) que podia ir pra um celular de verdade. Perde
+  // alguns casos raros de WhatsApp Business em numero de fixo/VoIP, mas o
+  // volume de fixo morto e muito maior que esse caso raro.
   const eligible = leads
     .filter((l): l is CandidateLead => !existingLeadIds.has(l.id))
-    .filter((l) => hasUsablePhone(l.phone))
-    .filter((l) => detectSocialPlatform(l.website) === null);
+    .filter((l) => isMobilePhone(l.phone))
+    .filter((l) => detectSocialPlatform(l.website) === null)
+    .filter((l) => {
+      const phone = normalizePhone(l.phone);
+      return !phone || !blockedPhones.has(phone);
+    });
 
   // Prioriza quem nao tem site - e o foco principal do negocio (prospect
   // direto pra vender site do zero), mesmo padrao ja usado em

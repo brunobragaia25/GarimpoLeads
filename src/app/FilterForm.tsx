@@ -108,6 +108,7 @@ export function FilterForm({
             <option value="">Todos</option>
             <option value="with">Com site</option>
             <option value="without">Sem site</option>
+            <option value="broken">Site fora do ar/expirado</option>
           </select>
         </div>
 

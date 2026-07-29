@@ -62,6 +62,8 @@ export default async function WhatsappQueuePage({
           is_slow: lead.is_slow,
           is_outdated: lead.is_outdated,
           is_wordpress: lead.is_wordpress,
+          is_broken: lead.is_broken,
+          broken_reason: lead.broken_reason,
           notes: lead.site_notes,
         }),
       }).body;

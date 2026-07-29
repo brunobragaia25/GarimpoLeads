@@ -42,7 +42,7 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
   const pathname = usePathname();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [filter, setFilter] = useState<"all" | "favorites" | "replied" | "unread" | "archived">("all");
+  const [filter, setFilter] = useState<"all" | "favorites" | "replied" | "unread" | "human" | "archived">("all");
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -58,6 +58,7 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
             if (filter === "favorites") return c.isFavorited;
             if (filter === "replied") return c.hasReplied;
             if (filter === "unread") return c.hasUnread;
+            if (filter === "human") return c.isHumanConfirmed;
             return true;
           });
 
@@ -195,6 +196,20 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
           Respondidas
         </button>
         <button
+          onClick={() => setFilter("human")}
+          className={`inline-flex shrink-0 items-center gap-1 rounded-t-md px-3 py-1.5 text-xs font-medium ${
+            filter === "human"
+              ? "bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50"
+              : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+          }`}
+        >
+          <span className="flex items-center gap-0.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          </span>
+          Humano
+        </button>
+        <button
           onClick={() => setFilter("archived")}
           className={`inline-flex shrink-0 items-center gap-1 rounded-t-md px-3 py-1.5 text-xs font-medium ${
             filter === "archived"
@@ -255,7 +270,9 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
                 ? "Nenhuma conversa respondida ainda."
                 : filter === "unread"
                   ? "Nenhuma conversa não lida."
-                  : filter === "archived"
+                  : filter === "human"
+                    ? "Nenhuma conversa confirmada como humana ainda."
+                    : filter === "archived"
                     ? "Nenhuma conversa arquivada."
                     : "Nenhuma conversa de WhatsApp ainda."}
         </div>
@@ -284,9 +301,23 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
                 )}
               </button>
 
-              {c.hasUnread && (
-                <span title="Mensagem não lida" className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
-              )}
+              <span className="flex shrink-0 items-center gap-1">
+                {c.hasUnread && (
+                  <span
+                    title="Mensagem não lida"
+                    className="h-3 w-3 rounded-full bg-red-500 ring-2 ring-red-200 dark:ring-red-950"
+                  />
+                )}
+                {c.isHumanConfirmed && (
+                  <span
+                    title="Provavelmente foi uma pessoa de verdade que respondeu, não bot/autoresponder"
+                    className="flex items-center gap-0.5"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  </span>
+                )}
+              </span>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-1">

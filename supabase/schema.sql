@@ -27,6 +27,8 @@ create table if not exists site_analysis (
   performance_score int, -- 0-100, ex: Lighthouse
   is_outdated boolean,
   is_slow boolean,
+  is_broken boolean, -- dominio aponta pra pagina de hospedagem vencida/suspensa, dominio estacionado (parked) ou pagina padrao de servidor sem site configurado
+  broken_reason text,
   notes text,
   analyzed_at timestamptz not null default now()
 );
@@ -106,6 +108,7 @@ create table if not exists whatsapp_conversations (
   favorited_at timestamptz, -- conversa favoritada, pra filtrar so as favoritas
   needs_handoff boolean not null default false, -- IA marcou que essa conversa precisa do Bruno
   handoff_reason text, -- motivo curto (reuniao, contrato, reclamacao, etc.)
+  human_confirmed_at timestamptz, -- IA avaliou que uma resposta do lead parece pessoa real, nao bot/autoresponder que passou do filtro de regex (bot-reply-detection.ts) - fica sticky, uma vez confirmado nao volta a null
   archived_at timestamptz, -- arquivada: some da lista "Todas", mas fica na aba "Arquivadas"
   status text not null default 'template_sent', -- template_sent | open | closed
   ai_enabled boolean not null default true, -- false depois que o humano manda mensagem manual
@@ -142,6 +145,20 @@ security definer
 as $$
   select pg_database_size(current_database());
 $$;
+
+-- Telefones que nao podem voltar a ser contatados, mesmo que o lead seja
+-- excluido e reaparecca num scraping futuro (o dedup normal em pipeline.ts
+-- so compara contra leads que ainda existem na tabela `leads`, entao um
+-- lead excluido virava invisivel pro dedup e podia ser re-inserido do zero
+-- com um id novo, recebendo o mesmo template de novo). Guarda o telefone
+-- normalizado (so digitos) pra sempre, independente do ciclo de vida do
+-- lead.
+create table if not exists blocked_contacts (
+  phone text primary key,
+  reason text not null default 'deleted_by_user',
+  created_at timestamptz not null default now()
+);
+alter table blocked_contacts enable row level security;
 
 create index if not exists idx_site_analysis_lead_id on site_analysis(lead_id);
 create index if not exists idx_outreach_lead_id on outreach(lead_id);

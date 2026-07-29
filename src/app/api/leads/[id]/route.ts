@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { COOKIE_NAME, isValidSessionCookie } from "@/lib/auth";
+import { blockPhone } from "@/lib/blocklist";
 
 async function isAuthorized(req: NextRequest): Promise<boolean> {
   const session = req.cookies.get(COOKIE_NAME)?.value;
@@ -41,6 +42,13 @@ export async function DELETE(
   }
 
   const { id: leadId } = await params;
+
+  // Bloqueia o telefone pra sempre antes de apagar - sem isso, um scraping
+  // futuro da mesma categoria/regiao acha o mesmo negocio "novo" (o dedup
+  // so compara contra leads que ainda existem) e o WhatsApp automatico
+  // manda o mesmo template de novo pra quem ja foi excluido.
+  const { data: lead } = await supabase.from("leads").select("phone").eq("id", leadId).maybeSingle();
+  await blockPhone(lead?.phone);
 
   // Apaga na mao em vez de confiar em ON DELETE CASCADE (nao garantido no
   // schema), pra nao deixar registro orfao em outreach/site_analysis.

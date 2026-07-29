@@ -55,6 +55,7 @@ async function findOrCreateConversation(
   from: string,
   waMessageId: string,
   body: string,
+  isBotReply: boolean,
   profileName?: string
 ): Promise<{ id: string; lead_id: string; ai_enabled: boolean } | null> {
   const { data: existing } = await supabase
@@ -70,13 +71,19 @@ async function findOrCreateConversation(
       body,
       wa_message_id: waMessageId,
     });
-    // Se o Bruno tinha "apagado" (exclusao suave) essa conversa da lista e o
-    // lead respondeu de verdade depois, reaparece na lista de novo em vez de
-    // ficar escondida pra sempre.
-    await supabase
-      .from("whatsapp_conversations")
-      .update({ last_inbound_at: new Date().toISOString(), deleted_at: null })
-      .eq("id", existing.id);
+    // So marca last_inbound_at quando for resposta de verdade - resposta
+    // automatica do outro lado nao significa que um humano viu a mensagem,
+    // entao nao pode contar como "ja respondeu" (isso bloquearia o
+    // follow-up pra sempre pra quem nunca teve chance de ver nada).
+    if (!isBotReply) {
+      // Se o Bruno tinha "apagado" (exclusao suave) essa conversa da lista e
+      // o lead respondeu de verdade depois, reaparece na lista de novo em
+      // vez de ficar escondida pra sempre.
+      await supabase
+        .from("whatsapp_conversations")
+        .update({ last_inbound_at: new Date().toISOString(), deleted_at: null })
+        .eq("id", existing.id);
+    }
     return existing;
   }
 
@@ -102,7 +109,7 @@ async function findOrCreateConversation(
       phone: from,
       status: "open",
       ai_enabled: true,
-      last_inbound_at: new Date().toISOString(),
+      last_inbound_at: isBotReply ? null : new Date().toISOString(),
     })
     .select("id, lead_id, ai_enabled")
     .single();
@@ -118,12 +125,17 @@ async function findOrCreateConversation(
     wa_message_id: waMessageId,
   });
 
-  // Lead quente (site/Ads) tem prioridade maior que um frio - avisa na
-  // hora, mesmo antes de saber se a IA vai marcar handoff na resposta.
-  const chatUrl = `${process.env.APP_URL}/whatsapp-chats/${newConversation.id}`;
-  await notifyTelegram(
-    `Lead quente no WhatsApp (via site/Ads)\n\nNome: ${profileName || "não informado"}\nTelefone: ${from}\n\n${chatUrl}`
-  );
+  // Se a primeira mensagem que chegou desse numero novo ja e uma resposta
+  // automatica (autoresponder do proprio numero), nao faz sentido acordar o
+  // Bruno com "lead quente" - ainda nao apareceu nenhum humano na conversa.
+  if (!isBotReply) {
+    // Lead quente (site/Ads) tem prioridade maior que um frio - avisa na
+    // hora, mesmo antes de saber se a IA vai marcar handoff na resposta.
+    const chatUrl = `${process.env.APP_URL}/whatsapp-chats/${newConversation.id}`;
+    await notifyTelegram(
+      `Lead quente no WhatsApp (via site/Ads)\n\nNome: ${profileName || "não informado"}\nTelefone: ${from}\n\n${chatUrl}`
+    );
+  }
 
   return newConversation;
 }
@@ -150,7 +162,12 @@ async function isRepeatedInboundMessage(conversationId: string, body: string): P
 }
 
 async function handleIncomingMessage(from: string, waMessageId: string, body: string, profileName?: string) {
-  const conversation = await findOrCreateConversation(from, waMessageId, body, profileName);
+  // Calculado antes de criar/achar a conversa - decide ali dentro se
+  // last_inbound_at deve ser marcado (resposta automatica nao conta como
+  // "o lead respondeu de verdade", senao o follow-up fica bloqueado pra
+  // sempre pra quem nunca teve chance de ver a mensagem).
+  const isBotReply = detectBotReply(body);
+  const conversation = await findOrCreateConversation(from, waMessageId, body, isBotReply, profileName);
 
   // Falha ao criar lead/conversa - já logado dentro de findOrCreateConversation.
   if (!conversation) return;
@@ -160,7 +177,7 @@ async function handleIncomingMessage(from: string, waMessageId: string, body: st
   // duas IAs conversando sozinhas gastando tokens de verdade a cada troca.
   // Verificado antes do resto (inclusive da notificacao) pra nao acordar o
   // Bruno no celular/Mac toda vez que um bot repete a mesma mensagem.
-  if (detectBotReply(body)) return;
+  if (isBotReply) return;
   if (await isRepeatedInboundMessage(conversation.id, body)) return;
 
   const { data: leadForNotify } = await supabase
@@ -270,6 +287,10 @@ async function handleIncomingMessage(from: string, waMessageId: string, body: st
         // perde no meio de outras mensagens) - fica visivel na lista de
         // chats ate o Bruno assumir a conversa manualmente.
         ...(reply.needsHandoff ? { needs_handoff: true, handoff_reason: reply.handoffReason } : {}),
+        // Sticky: uma vez que a IA confirma que teve gente de verdade
+        // respondendo, fica marcado pro resto da conversa (nao some se uma
+        // mensagem seguinte for ambigua).
+        ...(reply.isHumanReply ? { human_confirmed_at: now } : {}),
       })
       .eq("id", conversation.id);
 

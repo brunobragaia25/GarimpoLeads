@@ -4,6 +4,7 @@ import { deduplicateLeads, normalizePhone } from "./deduplication";
 import { analyzeSite } from "./site-analysis";
 import { findEmailForWebsite } from "./hunter";
 import { scrapeEmailFromWebsite } from "./email-scraper";
+import { fetchBlockedPhones } from "./blocklist";
 
 // O PostgREST do Supabase trunca qualquer resposta em 1000 linhas (config
 // "Max Rows" do projeto) mesmo com `.limit()` maior no client - sem paginar
@@ -149,12 +150,17 @@ export async function scrapeLeadsForQuery(category: string, location: string) {
       .filter((p): p is string => p !== null)
   );
 
+  // Telefones bloqueados (lead excluido antes) tambem contam como
+  // duplicata - sem isso, o mesmo negocio reaparece "novo" num scraping
+  // futuro e volta pra fila de contato.
+  const blockedPhones = await fetchBlockedPhones();
+
   const newLeads = deduped.filter((l) => {
     const key = `${l.name.trim().toLowerCase()}|${(l.address ?? "").trim().toLowerCase()}`;
     if (existingKeys.has(key)) return false;
 
     const phone = normalizePhone(l.phone);
-    if (phone && existingPhoneSet.has(phone)) return false;
+    if (phone && (existingPhoneSet.has(phone) || blockedPhones.has(phone))) return false;
 
     return true;
   });

@@ -25,6 +25,8 @@ export interface LeadWithDetails {
   performance_score: number | null;
   is_outdated: boolean | null;
   is_slow: boolean | null;
+  is_broken: boolean | null;
+  broken_reason: string | null;
   site_notes: string | null;
   email: string | null;
   email_confidence: number | null;
@@ -90,6 +92,8 @@ export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
       performance_score: analysis?.performance_score ?? null,
       is_outdated: analysis?.is_outdated ?? null,
       is_slow: analysis?.is_slow ?? null,
+      is_broken: analysis?.is_broken ?? null,
+      broken_reason: analysis?.broken_reason ?? null,
       site_notes: analysis?.notes ?? null,
       email: outreach?.email ?? null,
       email_confidence: outreach?.email_confidence ?? null,
@@ -113,6 +117,7 @@ export function isPriorityProspect(lead: LeadWithDetails): boolean {
   return (
     lead.has_website === false ||
     lead.social_platform !== null ||
+    lead.is_broken === true ||
     lead.is_wordpress === true ||
     lead.is_slow === true ||
     lead.is_outdated === true
@@ -126,6 +131,7 @@ export function isPriorityProspect(lead: LeadWithDetails): boolean {
 export function computeLeadScore(lead: LeadWithDetails): number {
   let score = 0;
   if (lead.has_website === false) score += 100;
+  if (lead.is_broken) score += 90;
   if (lead.social_platform !== null) score += 80;
   if (lead.is_wordpress) score += 30;
   if (lead.is_slow) score += 30;

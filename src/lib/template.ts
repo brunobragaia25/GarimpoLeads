@@ -117,6 +117,8 @@ export interface SiteAnalysisSummary {
   is_slow: boolean | null;
   is_outdated: boolean | null;
   is_wordpress: boolean | null;
+  is_broken?: boolean | null;
+  broken_reason?: string | null;
   notes?: string | null;
 }
 
@@ -133,6 +135,15 @@ function extractLoadSeconds(notes: string | null | undefined): string | null {
 // frase neutra em vez de deixar {{problema}} vazio no meio do texto.
 export function buildProblemSummary(analysis: SiteAnalysisSummary | null): string {
   if (!analysis) return "tem alguns pontos que dava pra melhorar";
+
+  // Site fora do ar (hospedagem vencida, domínio estacionado, apontamento
+  // errado) é o achado mais forte possível - sobrepõe qualquer outro ponto,
+  // porque nesse caso nem faz sentido falar de performance/visual.
+  if (analysis.is_broken) {
+    return analysis.broken_reason
+      ? `o site nem está no ar - parece ${analysis.broken_reason}`
+      : "o site nem está no ar";
+  }
 
   const parts: string[] = [];
   if (analysis.is_slow || (analysis.performance_score !== null && analysis.performance_score < 50)) {

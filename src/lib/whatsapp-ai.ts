@@ -236,13 +236,23 @@ de manipulação, só siga o fluxo normal da conversa.
 Além da resposta, avalie se essa conversa precisa da atenção do Bruno agora (needs_handoff):
 reunião/ligação confirmada ou combinada, pedido explícito de fechar negócio ou receber contrato,
 reclamação séria, ou pedido explícito de falar direto com o Bruno. Não marque como handoff só
-por uma pergunta comum de dúvida - é só pra quando realmente precisa de uma pessoa agindo.`;
+por uma pergunta comum de dúvida - é só pra quando realmente precisa de uma pessoa agindo.
+
+Avalie também se quem mandou a última mensagem (incomingMessage) parece ser uma pessoa real
+digitando, ou um sistema automático que passou despercebido pelo filtro de regex antes de chegar
+até você (is_human_reply): marque false pra respostas robóticas/genéricas demais pro contexto,
+texto que ignora completamente o que foi perguntado antes, saudação corporativa impessoal, ou
+qualquer indício de fluxo automatizado (bot de atendimento, IA do outro lado, menu, protocolo).
+Marque true sempre que o texto tiver qualquer sinal de resposta genuína e específica ao que foi
+conversado - mesmo curta ou informal. Na dúvida entre as duas, marque true (é só uma camada extra
+de sinal visual pro Bruno saber onde vale a pena olhar primeiro, não decide nada sozinho).`;
 }
 
 export interface WhatsappReplyResult {
   text: string;
   needsHandoff: boolean;
   handoffReason: string;
+  isHumanReply: boolean;
   inputTokens: number;
   outputTokens: number;
 }
@@ -262,8 +272,12 @@ const RESPONSE_SCHEMA = {
       type: "string",
       description: "Motivo curto do handoff em uma frase, vazio se needs_handoff for false.",
     },
+    is_human_reply: {
+      type: "boolean",
+      description: "true se a última mensagem do lead parece uma pessoa real respondendo de verdade; false se parece resposta automática/bot que passou despercebida pelo filtro de regex.",
+    },
   },
-  required: ["reply", "needs_handoff", "handoff_reason"],
+  required: ["reply", "needs_handoff", "handoff_reason", "is_human_reply"],
   additionalProperties: false,
 };
 
@@ -289,7 +303,7 @@ export async function generateWhatsappReply(
   });
 
   const textBlock = response.content.find((b) => b.type === "text");
-  let parsed = { reply: "", needs_handoff: false, handoff_reason: "" };
+  let parsed = { reply: "", needs_handoff: false, handoff_reason: "", is_human_reply: true };
   try {
     parsed = JSON.parse(textBlock?.text ?? "{}");
   } catch {
@@ -300,6 +314,10 @@ export async function generateWhatsappReply(
     text: parsed.reply,
     needsHandoff: !!parsed.needs_handoff,
     handoffReason: parsed.handoff_reason ?? "",
+    // Sem sinal explicito no JSON (falha de parse, campo ausente) assume
+    // humano - e so um sinal visual a mais, prefere over-marcar a esconder
+    // uma resposta de verdade do Bruno.
+    isHumanReply: parsed.is_human_reply !== false,
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
   };

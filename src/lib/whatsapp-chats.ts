@@ -12,6 +12,7 @@ export interface WhatsappConversationSummary {
   lastMessageAt: string | null;
   hasUnread: boolean;
   hasReplied: boolean;
+  isHumanConfirmed: boolean;
   isPinned: boolean;
   isFavorited: boolean;
   needsHandoff: boolean;
@@ -32,6 +33,8 @@ export interface WhatsappConversationDetail {
   leadName: string;
   leadCategory: string;
   leadAddress: string | null;
+  leadWebsite: string | null;
+  leadGoogleMapsUrl: string | null;
   phone: string;
   status: string;
   aiEnabled: boolean;
@@ -47,7 +50,7 @@ export const getWhatsappConversations = cache(async (): Promise<WhatsappConversa
   const { data: conversations, error } = await supabase
     .from("whatsapp_conversations")
     .select(
-      "id, phone, status, ai_enabled, lead_id, last_inbound_at, last_read_at, pinned_at, favorited_at, needs_handoff, handoff_reason, archived_at, created_at, leads(name, category)"
+      "id, phone, status, ai_enabled, lead_id, last_inbound_at, last_read_at, pinned_at, favorited_at, needs_handoff, handoff_reason, human_confirmed_at, archived_at, created_at, leads(name, category)"
     )
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
@@ -89,6 +92,7 @@ export const getWhatsappConversations = cache(async (): Promise<WhatsappConversa
       lastMessageAt: last?.created_at ?? null,
       hasUnread,
       hasReplied: !!c.last_inbound_at,
+      isHumanConfirmed: !!c.human_confirmed_at,
       isPinned: !!c.pinned_at,
       isFavorited: !!c.favorited_at,
       needsHandoff: !!c.needs_handoff,
@@ -128,7 +132,9 @@ export async function getWhatsappConversationDetail(
 
   const { data: conversation, error } = await supabase
     .from("whatsapp_conversations")
-    .select("id, phone, status, ai_enabled, needs_handoff, handoff_reason, leads(name, category, address)")
+    .select(
+      "id, phone, status, ai_enabled, needs_handoff, handoff_reason, leads(name, category, address, website, google_maps_url)"
+    )
     .eq("id", id)
     .is("deleted_at", null)
     .maybeSingle();
@@ -149,6 +155,8 @@ export async function getWhatsappConversationDetail(
     leadName: lead?.name ?? "Lead removido",
     leadCategory: lead?.category ?? "",
     leadAddress: lead?.address ?? null,
+    leadWebsite: lead?.website ?? null,
+    leadGoogleMapsUrl: lead?.google_maps_url ?? null,
     phone: conversation.phone,
     status: conversation.status,
     aiEnabled: conversation.ai_enabled,

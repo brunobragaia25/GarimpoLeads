@@ -80,6 +80,23 @@ const BOT_REPLY_PATTERNS = [
   "ja iremos responder",
   "ja conhece nossa pagina",
   "conheca nossa pagina do instagram",
+  // Recado tipo secretaria eletronica ("deixe seu recado, assim que eu
+  // puder lhe retorno") - resposta automatica de quem nao esta olhando o
+  // whatsapp, sem se identificar como bot explicitamente.
+  "deixe seu recado",
+  "assim que eu puder lhe retorno",
+  "assim que eu puder te retorno",
+  // Fallback de menu numerado quando a pessoa (na real, o bot) manda algo
+  // fora das opcoes esperadas - varia o texto exato mas sempre remete a
+  // escolher uma opcao "acima"/"abaixo", nao so as frases ja cobertas.
+  "digite uma das opcoes",
+  "escolha uma opcao valida",
+  "opcao invalida",
+  // Numero de protocolo de atendimento - so aparece em fluxo automatico/
+  // corporativo, pessoa real numa conversa de whatsapp comum nao cita isso.
+  "numero de protocolo",
+  "protocolo do nosso atendimento",
+  "protocolo do atendimento",
 ];
 
 // Heuristica estrutural complementar: menu de atendimento automatico quase
