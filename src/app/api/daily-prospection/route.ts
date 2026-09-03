@@ -7,6 +7,11 @@ import { getPairsForDay } from "@/config/prospection";
 
 export const maxDuration = 300;
 
+// Interruptor manual de emergencia - true enquanto o envio automatico de
+// WhatsApp estiver pausado (ver comentario mais abaixo, junto ao bloco que
+// usa esta flag).
+const WHATSAPP_AUTO_SEND_DISABLED = true;
+
 // Deixa margem de segurança pra sempre sobrar tempo de gravar o log final,
 // mesmo que uma etapa individual demore mais que o previsto.
 const TIME_BUDGET_MS = 260_000;
@@ -142,32 +147,41 @@ export async function GET(req: NextRequest) {
       errors.push("follow-ups: pulado por falta de tempo");
     }
 
-    if (timeLeft() > 10_000) {
-      try {
-        const whatsappResult = await sendPendingWhatsappTemplates(WHATSAPP_TEMPLATES_LIMIT_PER_DAY, deadline);
-        whatsappTemplatesSent = whatsappResult.sent;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "erro desconhecido";
-        errors.push(`whatsapp-templates: ${message}`);
-      }
+    // Envio automatico de WhatsApp pausado a pedido do usuario (conta Meta
+    // sem forma de pagamento ativa - continuar mandando queima cota e/ou
+    // gera cobranca sem entregar nada). Reativar removendo este if quando
+    // o pagamento estiver resolvido.
+    if (WHATSAPP_AUTO_SEND_DISABLED) {
+      errors.push("whatsapp-templates: desativado manualmente");
+      errors.push("whatsapp-followups: desativado manualmente");
     } else {
-      errors.push("whatsapp-templates: pulado por falta de tempo");
-    }
+      if (timeLeft() > 10_000) {
+        try {
+          const whatsappResult = await sendPendingWhatsappTemplates(WHATSAPP_TEMPLATES_LIMIT_PER_DAY, deadline);
+          whatsappTemplatesSent = whatsappResult.sent;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "erro desconhecido";
+          errors.push(`whatsapp-templates: ${message}`);
+        }
+      } else {
+        errors.push("whatsapp-templates: pulado por falta de tempo");
+      }
 
-    if (timeLeft() > 10_000) {
-      try {
-        const whatsappFollowUpResult = await sendPendingWhatsappFollowUps(
-          WHATSAPP_FOLLOWUP_DAYS_THRESHOLD,
-          WHATSAPP_FOLLOWUP_LIMIT_PER_DAY,
-          deadline
-        );
-        whatsappFollowUpsSent = whatsappFollowUpResult.sent;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "erro desconhecido";
-        errors.push(`whatsapp-followups: ${message}`);
+      if (timeLeft() > 10_000) {
+        try {
+          const whatsappFollowUpResult = await sendPendingWhatsappFollowUps(
+            WHATSAPP_FOLLOWUP_DAYS_THRESHOLD,
+            WHATSAPP_FOLLOWUP_LIMIT_PER_DAY,
+            deadline
+          );
+          whatsappFollowUpsSent = whatsappFollowUpResult.sent;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "erro desconhecido";
+          errors.push(`whatsapp-followups: ${message}`);
+        }
+      } else {
+        errors.push("whatsapp-followups: pulado por falta de tempo");
       }
-    } else {
-      errors.push("whatsapp-followups: pulado por falta de tempo");
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";
