@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, isValidSessionCookie } from "@/lib/auth";
 import { sendPendingOutreach } from "@/lib/send-outreach";
+import type { Country } from "@/lib/types";
 
 export const maxDuration = 300;
 
@@ -16,9 +17,10 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const limit = Math.min(body.limit ?? 100, 500);
+  const country: Country | undefined = body.country === "US" ? "US" : body.country === "BR" ? "BR" : undefined;
 
   try {
-    const result = await sendPendingOutreach(limit, body.leadId);
+    const result = await sendPendingOutreach(limit, body.leadId, undefined, country);
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";

@@ -91,7 +91,12 @@ function unsubscribeLink(leadId: string, token: string, country: Country): strin
   return `${process.env.APP_URL}/api/unsubscribe?lead=${leadId}&token=${token}&country=${country}`;
 }
 
-export async function sendPendingOutreach(limit = 100, leadId?: string, deadline = Infinity) {
+export async function sendPendingOutreach(
+  limit = 100,
+  leadId?: string,
+  deadline = Infinity,
+  country?: Country
+) {
   const resolveTemplate = await buildTemplateResolver();
   const dailyLimit = Number(process.env.SEND_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
 
@@ -110,15 +115,23 @@ export async function sendPendingOutreach(limit = 100, leadId?: string, deadline
     };
   }
 
+  // `!inner` faz o filtro em leads.country valer de verdade (join normal
+  // deixaria a linha de outreach passar mesmo sem bater o filtro do lado
+  // relacionado) - so usado em chamadas manuais pra atacar um pais
+  // especifico sem depender da ordem (que privilegia o lead mais antigo,
+  // ou seja, o backlog de outro pais).
   let query = supabase
     .from("outreach")
-    .select("id, lead_id, email, leads(name, category, address, country)")
+    .select(country ? "id, lead_id, email, leads!inner(name, category, address, country)" : "id, lead_id, email, leads(name, category, address, country)")
     .eq("status", "pending")
     .not("email", "is", null)
     .order("created_at", { ascending: true });
 
   if (leadId) {
     query = query.eq("lead_id", leadId);
+  }
+  if (country) {
+    query = query.eq("leads.country", country);
   }
 
   const { data: rows, error } = await query.limit(effectiveLimit);
