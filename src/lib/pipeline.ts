@@ -57,7 +57,8 @@ async function fetchAllLeadPhones(): Promise<{ phone: string | null }[]> {
 // leads com site (precisa analisar de verdade) - mesma paginação nos dois
 // casos, só muda o filtro de presença de website.
 async function fetchAllLeadsByWebsitePresence(
-  hasWebsite: boolean
+  hasWebsite: boolean,
+  country?: Country
 ): Promise<{ id: string; website: string | null }[]> {
   const rows: { id: string; website: string | null }[] = [];
 
@@ -69,6 +70,7 @@ async function fetchAllLeadsByWebsitePresence(
       .range(offset, offset + POSTGREST_PAGE_SIZE - 1);
 
     query = hasWebsite ? query.not("website", "is", null) : query.is("website", null);
+    if (country) query = query.eq("country", country);
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);
@@ -228,13 +230,15 @@ export async function analyzePendingSites(limit = 50) {
 // ja tinha acabado ficam sem registro em `outreach` e sao retentados no
 // proximo dia; leads em que o Hunter foi consultado e nao achou nada ganham
 // registro com email null, pra nao queimar a cota de novo no mesmo lead.
-export async function findPendingEmails(hunterLimit = 2, scrapeLimit = 100) {
+export async function findPendingEmails(hunterLimit = 2, scrapeLimit = 100, country?: Country) {
   const processedIds = new Set(await fetchAllColumn("outreach", "lead_id"));
 
   // Ordenado do mais antigo pro mais novo, e limite bem acima do total de
   // leads-com-site esperado, senao um teto baixo faz o mesmo lote antigo
   // ser reconsiderado pra sempre enquanto leads novos nunca sao alcancados.
-  const leads = await fetchAllLeadsByWebsitePresence(true);
+  // `country` e opcional - so usado em chamadas manuais pra atacar um pais
+  // especifico sem disputar o orcamento diario com o backlog de outro.
+  const leads = await fetchAllLeadsByWebsitePresence(true, country);
 
   const pending = leads
     .filter((l) => !processedIds.has(l.id))

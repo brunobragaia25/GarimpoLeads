@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
   }
 
   const params = req.nextUrl.searchParams;
+  const countryFilter = params.get("country") === "US" ? "US" : "BR";
   const category = params.get("category") ?? "";
   const status = (params.get("status") as EmailFilter) ?? "all";
   const search = (params.get("search") ?? "").trim().toLowerCase();
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
   const allLeads = await getLeadsWithDetails();
 
   const filtered = allLeads.filter((lead) => {
+    if (lead.country !== countryFilter) return false;
     if (category && lead.category !== category) return false;
     if (!matchesEmailFilter(lead, status)) return false;
     if (search && !lead.name.toLowerCase().includes(search)) return false;

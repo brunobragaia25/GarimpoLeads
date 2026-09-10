@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { category, location } = await req.json();
+  const { category, location, country } = await req.json();
   if (!category || !location) {
     return NextResponse.json(
       { error: "category e location são obrigatórios" },
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await scrapeLeadsForQuery(category, location);
+    const result = await scrapeLeadsForQuery(category, location, country === "US" ? "US" : "BR");
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";

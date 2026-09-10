@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findPendingEmails } from "@/lib/pipeline";
+import type { Country } from "@/lib/types";
 
 function isAuthorized(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
@@ -19,9 +20,10 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const hunterLimit = Math.min(body.hunterLimit ?? DEFAULT_HUNTER_LIMIT, 50);
   const scrapeLimit = Math.min(body.scrapeLimit ?? DEFAULT_SCRAPE_LIMIT, 500);
+  const country: Country | undefined = body.country === "US" ? "US" : body.country === "BR" ? "BR" : undefined;
 
   try {
-    const result = await findPendingEmails(hunterLimit, scrapeLimit);
+    const result = await findPendingEmails(hunterLimit, scrapeLimit, country);
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";
