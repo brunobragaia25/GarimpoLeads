@@ -235,9 +235,18 @@ export interface TemplateLeadData {
   problem?: string;
 }
 
+// Nome do Google Business às vezes vem com tagline de marketing colada
+// depois de um "|" (ex: "Ivan and Mike Team | Luxury Real Estate Experts /
+// Advisors | Miami, FL") - fica estranho como sujeito de frase no email.
+// Corta tudo a partir do primeiro "|" e usa só o nome de verdade.
+function cleanBusinessName(name: string): string {
+  const cleaned = name.split("|")[0].trim();
+  return cleaned || name.trim();
+}
+
 export function renderTemplate(template: MessageTemplate, lead: TemplateLeadData): MessageTemplate {
   const vars: Record<string, string> = {
-    empresa: lead.name,
+    empresa: cleanBusinessName(lead.name),
     categoria: lead.category,
     cidade: extractCity(lead.address),
     problema: lead.problem ?? "tem alguns pontos que dava pra melhorar",
