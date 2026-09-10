@@ -58,7 +58,8 @@ async function fetchAllLeadPhones(): Promise<{ phone: string | null }[]> {
 // casos, só muda o filtro de presença de website.
 async function fetchAllLeadsByWebsitePresence(
   hasWebsite: boolean,
-  country?: Country
+  country?: Country,
+  order: "asc" | "desc" = "asc"
 ): Promise<{ id: string; website: string | null }[]> {
   const rows: { id: string; website: string | null }[] = [];
 
@@ -66,7 +67,7 @@ async function fetchAllLeadsByWebsitePresence(
     let query = supabase
       .from("leads")
       .select("id, website")
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: order === "asc" })
       .range(offset, offset + POSTGREST_PAGE_SIZE - 1);
 
     query = hasWebsite ? query.not("website", "is", null) : query.is("website", null);
@@ -233,12 +234,18 @@ export async function analyzePendingSites(limit = 50) {
 export async function findPendingEmails(hunterLimit = 2, scrapeLimit = 100, country?: Country) {
   const processedIds = new Set(await fetchAllColumn("outreach", "lead_id"));
 
-  // Ordenado do mais antigo pro mais novo, e limite bem acima do total de
-  // leads-com-site esperado, senao um teto baixo faz o mesmo lote antigo
-  // ser reconsiderado pra sempre enquanto leads novos nunca sao alcancados.
+  // Ordenado do MAIS NOVO pro mais antigo (era o contrario antes - bug
+  // corrigido): lead cuja raspagem falha e a cota do Hunter ja acabou no
+  // dia fica sem registro em `outreach` e e retentado pra sempre, entao em
+  // ordem crescente ele nunca sai da frente da fila e trava os leads novos
+  // atras dele indefinidamente (foi assim que ~2500 leads BR acumularam
+  // sem NUNCA ter o email buscado). Do mais novo pro mais antigo, um lead
+  // travado afunda pro fim da fila em vez de bloquear os que vem depois -
+  // ele ainda e retentado (so nao prioritario), e lead novo sempre recebe
+  // a tentativa de raspagem gratis no mesmo dia em que aparece.
   // `country` e opcional - so usado em chamadas manuais pra atacar um pais
   // especifico sem disputar o orcamento diario com o backlog de outro.
-  const leads = await fetchAllLeadsByWebsitePresence(true, country);
+  const leads = await fetchAllLeadsByWebsitePresence(true, country, "desc");
 
   const pending = leads
     .filter((l) => !processedIds.has(l.id))
