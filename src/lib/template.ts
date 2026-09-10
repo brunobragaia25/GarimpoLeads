@@ -146,8 +146,11 @@ export function buildProblemSummary(analysis: SiteAnalysisSummary | null): strin
       : "o site nem está no ar";
   }
 
+  // Limiar bem mais permissivo que is_slow (>3s): qualquer nota abaixo de
+  // 90 já vale citar o número real (segundo/nota concretos convencem mais
+  // que "tá lento" genérico, mesmo quando o site não é tecnicamente lento).
   const parts: string[] = [];
-  if (analysis.is_slow || (analysis.performance_score !== null && analysis.performance_score < 50)) {
+  if (analysis.is_slow || (analysis.performance_score !== null && analysis.performance_score < 90)) {
     const seconds = extractLoadSeconds(analysis.notes);
     if (seconds && analysis.performance_score !== null) {
       parts.push(
@@ -186,7 +189,7 @@ export function buildProblemSummaryEN(analysis: SiteAnalysisSummary | null): str
   }
 
   const parts: string[] = [];
-  if (analysis.is_slow || (analysis.performance_score !== null && analysis.performance_score < 50)) {
+  if (analysis.is_slow || (analysis.performance_score !== null && analysis.performance_score < 90)) {
     const seconds = extractLoadSeconds(analysis.notes, "en");
     if (seconds && analysis.performance_score !== null) {
       parts.push(
