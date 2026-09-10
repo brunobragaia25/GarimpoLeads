@@ -7,40 +7,48 @@ import { MessageSquareText, Save, Check, Info } from "lucide-react";
 const FOLLOWUP_CATEGORY = "__followup__";
 const WHATSAPP_NO_SITE_CATEGORY = "__whatsapp_no_site__";
 
+type Country = "BR" | "US";
+
 export default function TemplatePage() {
+  const [country, setCountry] = useState<Country>("BR");
   const [category, setCategory] = useState<string>("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [configCategories, setConfigCategories] = useState<string[]>([]);
-  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [categoriesByCountry, setCategoriesByCountry] = useState<Record<Country, string[]>>({
+    BR: [],
+    US: [],
+  });
 
   useEffect(() => {
     loadTemplate(category);
 
-    fetch("/api/config")
-      .then((res) => res.json())
-      .then((data) => {
-        const categories: string[] = data.categories ?? [];
-        setConfigCategories(categories);
+    Promise.all([
+      fetch("/api/config?country=BR").then((res) => res.json()),
+      fetch("/api/config?country=US").then((res) => res.json()),
+      fetch("/api/template?list=1").then((res) => res.json()),
+    ]).then(([brConfig, usConfig, templateData]) => {
+      const brCategories: string[] = brConfig.categories ?? [];
+      const usCategories: string[] = usConfig.categories ?? [];
 
-        fetch("/api/template?list=1")
-          .then((res) => res.json())
-          .then((templateData) => {
-            const extra = (templateData.templates ?? [])
-              .map((t: { category: string | null }) => t.category)
-              .filter(
-                (c: string | null): c is string =>
-                  !!c &&
-                  !categories.includes(c) &&
-                  c !== FOLLOWUP_CATEGORY &&
-                  c !== WHATSAPP_NO_SITE_CATEGORY
-              );
-            setCustomCategories([...new Set(extra)] as string[]);
-          });
+      // Categoria com template proprio que nao esta em nenhuma config (ex:
+      // categoria removida da config depois de ja ter template) - cai no
+      // BR por padrao, ja que e o caso mais comum hoje.
+      const known = new Set([...brCategories, ...usCategories]);
+      const extra = (templateData.templates ?? [])
+        .map((t: { category: string | null }) => t.category)
+        .filter(
+          (c: string | null): c is string =>
+            !!c && !known.has(c) && c !== FOLLOWUP_CATEGORY && c !== WHATSAPP_NO_SITE_CATEGORY
+        );
+
+      setCategoriesByCountry({
+        BR: [...new Set([...brCategories, ...extra])] as string[],
+        US: [...new Set(usCategories)] as string[],
       });
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -62,6 +70,11 @@ export default function TemplatePage() {
     loadTemplate(newCategory);
   }
 
+  function handleCountryChange(newCountry: Country) {
+    setCountry(newCountry);
+    handleCategoryChange("");
+  }
+
   async function handleSave() {
     setSaving(true);
     setSaved(false);
@@ -74,7 +87,7 @@ export default function TemplatePage() {
     setSaved(true);
   }
 
-  const allCategories = [...configCategories, ...customCategories];
+  const allCategories = categoriesByCountry[country];
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-black">
@@ -106,7 +119,28 @@ export default function TemplatePage() {
           </span>
         </div>
 
-        <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="mt-4 inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950">
+          {(
+            [
+              { value: "BR", label: "🇧🇷 Brasil" },
+              { value: "US", label: "🇺🇸 EUA" },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.value}
+              onClick={() => handleCountryChange(option.value)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                country === option.value
+                  ? "bg-emerald-600 text-white"
+                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
           <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Categoria
           </label>
@@ -121,15 +155,21 @@ export default function TemplatePage() {
                 {c}
               </option>
             ))}
-            <option value={FOLLOWUP_CATEGORY}>Follow-up (acompanhamento automático)</option>
-            <option value={WHATSAPP_NO_SITE_CATEGORY}>WhatsApp (leads sem site)</option>
+            {country === "BR" && (
+              <>
+                <option value={FOLLOWUP_CATEGORY}>Follow-up (acompanhamento automático)</option>
+                <option value={WHATSAPP_NO_SITE_CATEGORY}>WhatsApp (leads sem site)</option>
+              </>
+            )}
           </select>
           <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
             {category === FOLLOWUP_CATEGORY
               ? "Enviado automaticamente pra quem foi contatado há 5+ dias e não recebeu follow-up ainda. Se não configurar, usa um texto padrão simples."
               : category === WHATSAPP_NO_SITE_CATEGORY
                 ? "Texto que já vem preenchido ao clicar no botão de WhatsApp de um lead sem site, no dashboard."
-                : 'Se uma categoria não tiver template próprio, usa o "Padrão" na hora de enviar.'}
+                : category === "" && country === "US"
+                  ? 'O "Padrão" é compartilhado com o Brasil (hoje em português) - toda categoria dos EUA já tem template próprio em inglês, então normalmente não é usado.'
+                  : 'Se uma categoria não tiver template próprio, usa o "Padrão" na hora de enviar.'}
           </p>
 
           {loading ? (
