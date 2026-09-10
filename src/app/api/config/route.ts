@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, isValidSessionCookie } from "@/lib/auth";
 import { getProspectionConfig, saveProspectionConfig } from "@/config/prospection";
+import type { Country } from "@/lib/types";
 
 async function isAuthorized(req: NextRequest): Promise<boolean> {
   const session = req.cookies.get(COOKIE_NAME)?.value;
   return isValidSessionCookie(session);
+}
+
+function parseCountry(value: string | null): Country {
+  return value === "US" ? "US" : "BR";
 }
 
 export async function GET(req: NextRequest) {
@@ -12,7 +17,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const config = await getProspectionConfig();
+  const country = parseCountry(req.nextUrl.searchParams.get("country"));
+  const config = await getProspectionConfig(country);
   return NextResponse.json(config);
 }
 
@@ -21,7 +27,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { categories, cities } = await req.json();
+  const { categories, cities, country } = await req.json();
   if (!Array.isArray(categories) || !Array.isArray(cities)) {
     return NextResponse.json(
       { error: "categories e cities precisam ser arrays" },
@@ -31,6 +37,7 @@ export async function POST(req: NextRequest) {
 
   try {
     await saveProspectionConfig(
+      parseCountry(typeof country === "string" ? country : null),
       categories.filter((c) => typeof c === "string" && c.trim()),
       cities.filter((c) => typeof c === "string" && c.trim())
     );

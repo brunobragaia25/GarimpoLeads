@@ -13,10 +13,16 @@ create table if not exists leads (
   website text,
   google_maps_url text,
   source text not null default 'google_maps',
+  country text not null default 'BR', -- BR | US - separa a prospecção por país (categorias/cidades em idiomas diferentes), pra nao misturar os dois no dashboard/fila
   created_at timestamptz not null default now(),
   crm_synced_at timestamptz, -- quando foi enviado como cliente pro GestãoDevz
   crm_doc_id text -- id do documento no Firestore, pra permitir desfazer
 );
+
+-- Coluna nova em banco ja existente (create table if not exists nao adiciona
+-- coluna em tabela ja criada) - roda de novo sem erro se ja existir.
+alter table leads add column if not exists country text not null default 'BR';
+create index if not exists idx_leads_country on leads(country);
 
 -- Resultado da análise do site do lead
 create table if not exists site_analysis (
@@ -72,13 +78,18 @@ create unique index if not exists idx_message_templates_category
   on message_templates ((coalesce(category, '')));
 
 -- Categorias e cidades usadas pelo cron diário (editável pelo dashboard).
--- Sempre 1 linha só; se vazia, o código usa os defaults embutidos.
+-- 1 linha por país (BR/US), cada um com sua própria rotação; se vazia pro
+-- país, o código usa os defaults embutidos (so BR tem default de verdade -
+-- US comeca vazio ate o usuario configurar, pra nao disparar sem querer).
 create table if not exists prospection_config (
   id uuid primary key default uuid_generate_v4(),
   categories text[] not null default '{}',
   cities text[] not null default '{}',
   updated_at timestamptz not null default now()
 );
+
+alter table prospection_config add column if not exists country text not null default 'BR';
+create unique index if not exists idx_prospection_config_country on prospection_config(country);
 
 -- Rate limit do login do dashboard (protecao contra forca bruta).
 create table if not exists login_attempts (
@@ -123,6 +134,7 @@ create table if not exists whatsapp_messages (
   direction text not null, -- inbound | outbound
   body text not null,
   wa_message_id text,
+  delivery_error text, -- motivo real que a Meta manda quando delivery_status = 'failed' (codigo + titulo do erro), pra dar pra diagnosticar falha em massa
   delivery_status text, -- sent | delivered | read | failed (so pra outbound, via webhook de status da Meta)
   created_at timestamptz not null default now()
 );
@@ -153,6 +165,18 @@ $$;
 -- com um id novo, recebendo o mesmo template de novo). Guarda o telefone
 -- normalizado (so digitos) pra sempre, independente do ciclo de vida do
 -- lead.
+-- Chave-valor generico pra ligar/desligar coisas sem precisar mexer em env
+-- var (que so aplica em redeploy) - usado primeiro pra pausar o envio
+-- automatico de WhatsApp quando a forma de pagamento da conta Meta cai
+-- (envio continua sendo aceito pela API mas falha 100% na entrega sem
+-- aviso, entao pausar direto na origem evita queimar a cota diaria a toa).
+create table if not exists app_settings (
+  key text primary key,
+  value text,
+  updated_at timestamptz not null default now()
+);
+alter table app_settings enable row level security;
+
 create table if not exists blocked_contacts (
   phone text primary key,
   reason text not null default 'deleted_by_user',

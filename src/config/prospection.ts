@@ -1,7 +1,10 @@
 import { supabase } from "@/lib/supabase";
+import type { Country } from "@/lib/types";
 
-// Usados como fallback se a tabela `prospection_config` estiver vazia, e
-// como sugestão inicial na tela de configurações do dashboard.
+// Usados como fallback pro BR se a tabela `prospection_config` estiver
+// vazia pro pais, e como sugestao inicial na tela de configuracoes do
+// dashboard. EUA nao tem default - fica vazio ate o usuario configurar de
+// proposito, pra nunca comecar a raspar la sem essa decisao explicita.
 export const DEFAULT_CATEGORIES = [
   "advogados",
   "dentistas",
@@ -35,6 +38,7 @@ export const DEFAULT_CITIES = [
 export interface CategoryCityPair {
   category: string;
   location: string;
+  country: Country;
 }
 
 export interface ProspectionConfig {
@@ -42,42 +46,35 @@ export interface ProspectionConfig {
   cities: string[];
 }
 
-export async function getProspectionConfig(): Promise<ProspectionConfig> {
+export async function getProspectionConfig(country: Country = "BR"): Promise<ProspectionConfig> {
   const { data } = await supabase
     .from("prospection_config")
     .select("categories, cities")
-    .limit(1)
+    .eq("country", country)
     .maybeSingle();
 
+  const defaultCategories = country === "BR" ? DEFAULT_CATEGORIES : [];
+  const defaultCities = country === "BR" ? DEFAULT_CITIES : [];
+
   const categories =
-    data?.categories && data.categories.length > 0 ? data.categories : DEFAULT_CATEGORIES;
-  const cities = data?.cities && data.cities.length > 0 ? data.cities : DEFAULT_CITIES;
+    data?.categories && data.categories.length > 0 ? data.categories : defaultCategories;
+  const cities = data?.cities && data.cities.length > 0 ? data.cities : defaultCities;
 
   return { categories, cities };
 }
 
 export async function saveProspectionConfig(
+  country: Country,
   categories: string[],
   cities: string[]
 ): Promise<void> {
-  const { data: existing } = await supabase
+  const { error } = await supabase
     .from("prospection_config")
-    .select("id")
-    .limit(1)
-    .maybeSingle();
-
-  if (existing) {
-    const { error } = await supabase
-      .from("prospection_config")
-      .update({ categories, cities, updated_at: new Date().toISOString() })
-      .eq("id", existing.id);
-    if (error) throw new Error(error.message);
-  } else {
-    const { error } = await supabase
-      .from("prospection_config")
-      .insert({ categories, cities });
-    if (error) throw new Error(error.message);
-  }
+    .upsert(
+      { country, categories, cities, updated_at: new Date().toISOString() },
+      { onConflict: "country" }
+    );
+  if (error) throw new Error(error.message);
 }
 
 // Foco principal do negocio e lead sem site (prospect direto pra vender
@@ -127,9 +124,10 @@ async function computeCategoryNoWebsiteRates(
  */
 export async function getPairsForDay(
   date: Date,
-  count: number
+  count: number,
+  country: Country = "BR"
 ): Promise<CategoryCityPair[]> {
-  const { categories: configCategories, cities } = await getProspectionConfig();
+  const { categories: configCategories, cities } = await getProspectionConfig(country);
 
   // Ordena as categorias da que mais traz lead sem site pra que menos traz -
   // como o loop abaixo e "categoria por fora, cidade por dentro", categoria
@@ -142,7 +140,7 @@ export async function getPairsForDay(
   );
 
   const allPairs: CategoryCityPair[] = categories.flatMap((category) =>
-    cities.map((location) => ({ category, location }))
+    cities.map((location) => ({ category, location, country }))
   );
 
   if (allPairs.length === 0) return [];

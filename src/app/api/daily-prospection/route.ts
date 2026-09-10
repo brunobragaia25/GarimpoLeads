@@ -3,7 +3,8 @@ import { supabase } from "@/lib/supabase";
 import { scrapeLeadsForQuery, analyzePendingSites, findPendingEmails } from "@/lib/pipeline";
 import { sendPendingOutreach, sendFollowUps } from "@/lib/send-outreach";
 import { sendPendingWhatsappTemplates, sendPendingWhatsappFollowUps } from "@/lib/send-whatsapp-outreach";
-import { getPairsForDay } from "@/config/prospection";
+import { getPairsForDay, getProspectionConfig } from "@/config/prospection";
+import type { Country } from "@/lib/types";
 
 export const maxDuration = 300;
 
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
   let followUpsSent = 0;
   let whatsappTemplatesSent = 0;
   let whatsappFollowUpsSent = 0;
-  let pairs: { category: string; location: string }[] = [];
+  const pairs: { category: string; location: string; country: Country }[] = [];
 
   const timeLeft = () => TIME_BUDGET_MS - (Date.now() - startedAt);
   // Prazo absoluto (epoch ms) pra passar pros loops de envio - eles checam
@@ -80,19 +81,34 @@ export async function GET(req: NextRequest) {
   // o log de execução em vez de perder o rastro do erro por completo.
   try {
     try {
-      pairs = await getPairsForDay(new Date(), PAIRS_PER_DAY);
+      // So entra na rotacao diaria o pais que tiver categoria E cidade
+      // configuradas - EUA fica de fora ate ser configurado de proposito
+      // (ver getProspectionConfig), pra nunca comecar a raspar la sem essa
+      // decisao explicita nem misturar com o BR sem querer.
+      const activeCountries: Country[] = [];
+      for (const country of ["BR", "US"] as const) {
+        const config = await getProspectionConfig(country);
+        if (config.categories.length > 0 && config.cities.length > 0) {
+          activeCountries.push(country);
+        }
+      }
+
+      const pairsPerCountry = Math.max(1, Math.floor(PAIRS_PER_DAY / Math.max(1, activeCountries.length)));
+      for (const country of activeCountries) {
+        pairs.push(...(await getPairsForDay(new Date(), pairsPerCountry, country)));
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "erro desconhecido";
       errors.push(`getPairsForDay: ${message}`);
     }
 
-    for (const { category, location } of pairs) {
+    for (const { category, location, country } of pairs) {
       if (timeLeft() < 30_000) {
         errors.push("scrape: parou por falta de tempo (orçamento de execução)");
         break;
       }
       try {
-        const result = await scrapeLeadsForQuery(category, location);
+        const result = await scrapeLeadsForQuery(category, location, country);
         leadsFound += result.new_leads;
       } catch (err) {
         const message = err instanceof Error ? err.message : "erro desconhecido";

@@ -18,7 +18,10 @@ function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
   );
 }
 
+type Country = "BR" | "US";
+
 export default function SettingsPage() {
+  const [country, setCountry] = useState<Country>("BR");
   const [categories, setCategories] = useState<string[]>([]);
   const [cities, setCities] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState("");
@@ -28,14 +31,20 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetch("/api/config")
+    fetch(`/api/config?country=${country}`)
       .then((res) => res.json())
       .then((data) => {
         setCategories(data.categories ?? []);
         setCities(data.cities ?? []);
         setLoading(false);
       });
-  }, []);
+  }, [country]);
+
+  function handleSelectCountry(next: Country) {
+    setLoading(true);
+    setSaved(false);
+    setCountry(next);
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -43,7 +52,7 @@ export default function SettingsPage() {
     await fetch("/api/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ categories, cities }),
+      body: JSON.stringify({ country, categories, cities }),
     });
     setSaving(false);
     setSaved(true);
@@ -83,6 +92,34 @@ export default function SettingsPage() {
             </p>
           </div>
         </div>
+
+        <div className="mb-4 mt-4 inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950">
+          {(
+            [
+              { value: "BR", label: "🇧🇷 Brasil" },
+              { value: "US", label: "🇺🇸 EUA" },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.value}
+              onClick={() => handleSelectCountry(option.value)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                country === option.value
+                  ? "bg-emerald-600 text-white"
+                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        {country === "US" && (
+          <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">
+            Sem categoria e cidade cadastradas aqui, o cron não raspa leads dos EUA - essa config
+            começa vazia de propósito, pra nunca misturar com o Brasil sem uma escolha explícita.
+          </p>
+        )}
 
         {loading ? (
           <p className="mt-6 text-sm text-zinc-500 dark:text-zinc-400">Carregando...</p>

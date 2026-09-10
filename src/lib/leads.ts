@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { detectSocialPlatform, type SocialPlatform } from "./social-link";
+import type { Country } from "./types";
 
 export function toBrasiliaDateStr(iso: string | null): string | null {
   if (!iso) return null;
@@ -19,6 +20,7 @@ export interface LeadWithDetails {
   address: string | null;
   website: string | null;
   google_maps_url: string | null;
+  country: Country;
   created_at: string;
   has_website: boolean | null;
   is_wordpress: boolean | null;
@@ -86,6 +88,7 @@ export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
       address: lead.address,
       website: lead.website,
       google_maps_url: lead.google_maps_url,
+      country: (lead.country ?? "BR") as Country,
       created_at: lead.created_at,
       has_website: analysis?.has_website ?? null,
       is_wordpress: analysis?.is_wordpress ?? null,

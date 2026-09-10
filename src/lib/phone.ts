@@ -20,11 +20,19 @@ export function hasUsablePhone(phone: string | null): boolean {
   return phone.replace(/\D/g, "").length >= 10;
 }
 
-export function whatsappLink(phone: string | null, prefilledText?: string): string | null {
+export function whatsappLink(
+  phone: string | null,
+  country: "BR" | "US" = "BR",
+  prefilledText?: string
+): string | null {
   if (!phone) return null;
   const digits = phone.replace(/\D/g, "");
   if (digits.length < 10) return null;
-  const withCountryCode = digits.startsWith("55") ? digits : `55${digits}`;
+  // O Google Places devolve o telefone formatado sem DDI - precisa
+  // completar aqui pro link do WhatsApp funcionar. DDI muda por país (55
+  // BR, 1 EUA); só completa se já não vier com o DDI.
+  const ddi = country === "US" ? "1" : "55";
+  const withCountryCode = digits.startsWith(ddi) ? digits : `${ddi}${digits}`;
   const base = `https://wa.me/${withCountryCode}`;
   return prefilledText ? `${base}?text=${encodeURIComponent(prefilledText)}` : base;
 }

@@ -5,6 +5,7 @@ import { analyzeSite } from "./site-analysis";
 import { findEmailForWebsite } from "./hunter";
 import { scrapeEmailFromWebsite } from "./email-scraper";
 import { fetchBlockedPhones } from "./blocklist";
+import type { Country } from "./types";
 
 // O PostgREST do Supabase trunca qualquer resposta em 1000 linhas (config
 // "Max Rows" do projeto) mesmo com `.limit()` maior no client - sem paginar
@@ -127,8 +128,8 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-export async function scrapeLeadsForQuery(category: string, location: string) {
-  const found = await searchLeads(category, location);
+export async function scrapeLeadsForQuery(category: string, location: string, country: Country = "BR") {
+  const found = await searchLeads(category, location, country);
   const deduped = deduplicateLeads(found);
 
   const existing = await fetchAllLeadNamesAndAddresses(category);

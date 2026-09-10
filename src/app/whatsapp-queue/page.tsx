@@ -6,15 +6,25 @@ import { PageHeader } from "../PageHeader";
 import { QueueClient, type QueueLead } from "./QueueClient";
 import { CategorySelect } from "./CategorySelect";
 import { MessageCircle } from "lucide-react";
+import type { Country } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 type SiteFilter = "all" | "with" | "without";
 
-function buildQueueHref({ site, category }: { site?: string; category?: string }): string {
+function buildQueueHref({
+  site,
+  category,
+  country,
+}: {
+  site?: string;
+  category?: string;
+  country?: string;
+}): string {
   const searchParams = new URLSearchParams();
   if (site) searchParams.set("site", site);
   if (category) searchParams.set("category", category);
+  if (country) searchParams.set("country", country);
   const query = searchParams.toString();
   return query ? `/whatsapp-queue?${query}` : "/whatsapp-queue";
 }
@@ -28,20 +38,26 @@ export default async function WhatsappQueuePage({
   const siteFilter: SiteFilter =
     params.site === "with" || params.site === "without" ? params.site : "all";
   const categoryFilter = params.category ?? "all";
+  const countryFilter: Country = params.country === "US" ? "US" : "BR";
 
   const allLeads = await getLeadsWithDetails();
   const whatsappTemplate = await getWhatsappNoSiteTemplate();
 
+  const brCount = allLeads.filter((l) => l.country === "BR").length;
+  const usCount = allLeads.filter((l) => l.country === "US").length;
+
   // Fica de fora da fila quem só tem link de rede social (Instagram,
   // LinkedIn, Facebook, Linktree) no campo "site" - não é um site de
   // verdade, então não vale gastar tempo manual nesses; quem não tem site
-  // nenhum ou tem site de verdade continua entrando normalmente.
+  // nenhum ou tem site de verdade continua entrando normalmente. País
+  // sempre filtrado - nunca mistura BR e EUA na mesma fila.
   const baseEligible = allLeads.filter(
     (l) =>
       !l.email &&
       hasUsablePhone(l.phone) &&
       (!l.outreach_status || l.outreach_status === "pending") &&
-      l.social_platform === null
+      l.social_platform === null &&
+      l.country === countryFilter
   );
 
   // Lista de categorias calculada antes do filtro de categoria (mas depois
@@ -90,7 +106,7 @@ export default async function WhatsappQueuePage({
         }),
       }).body;
 
-      const waLink = whatsappLink(lead.phone, message);
+      const waLink = whatsappLink(lead.phone, lead.country, message);
       if (!waLink) return null;
 
       return {
@@ -125,6 +141,27 @@ export default async function WhatsappQueuePage({
           </div>
         </div>
 
+        <div className="mt-4 inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950">
+          {(
+            [
+              { value: "BR", label: `🇧🇷 Brasil (${brCount})` },
+              { value: "US", label: `🇺🇸 EUA (${usCount})` },
+            ] as const
+          ).map((option) => (
+            <Link
+              key={option.value}
+              href={buildQueueHref({ country: option.value === "BR" ? undefined : option.value })}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                countryFilter === option.value
+                  ? "bg-emerald-600 text-white"
+                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
+              }`}
+            >
+              {option.label}
+            </Link>
+          ))}
+        </div>
+
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950">
             {(
@@ -136,7 +173,11 @@ export default async function WhatsappQueuePage({
             ).map((option) => (
               <Link
                 key={option.value}
-                href={buildQueueHref({ site: option.value === "all" ? undefined : option.value, category: categoryFilter === "all" ? undefined : categoryFilter })}
+                href={buildQueueHref({
+                  site: option.value === "all" ? undefined : option.value,
+                  category: categoryFilter === "all" ? undefined : categoryFilter,
+                  country: countryFilter === "BR" ? undefined : countryFilter,
+                })}
                 className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                   siteFilter === option.value
                     ? "bg-emerald-600 text-white"
@@ -152,10 +193,11 @@ export default async function WhatsappQueuePage({
             categories={categories}
             value={categoryFilter}
             siteFilter={siteFilter}
+            countryFilter={countryFilter}
           />
         </div>
 
-        <QueueClient leads={queue} key={`${siteFilter}:${categoryFilter}`} />
+        <QueueClient leads={queue} key={`${countryFilter}:${siteFilter}:${categoryFilter}`} />
       </main>
     </div>
   );

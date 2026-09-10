@@ -1,3 +1,5 @@
+export type Country = "BR" | "US";
+
 export interface Lead {
   id?: string;
   name: string;
@@ -7,5 +9,6 @@ export interface Lead {
   website?: string;
   google_maps_url?: string;
   source: string;
+  country?: Country;
   created_at?: string;
 }

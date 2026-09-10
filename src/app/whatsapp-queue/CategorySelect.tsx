@@ -6,10 +6,12 @@ export function CategorySelect({
   categories,
   value,
   siteFilter,
+  countryFilter,
 }: {
   categories: string[];
   value: string;
   siteFilter: string;
+  countryFilter: string;
 }) {
   const router = useRouter();
 
@@ -17,6 +19,7 @@ export function CategorySelect({
     const searchParams = new URLSearchParams();
     if (siteFilter !== "all") searchParams.set("site", siteFilter);
     if (category !== "all") searchParams.set("category", category);
+    if (countryFilter !== "BR") searchParams.set("country", countryFilter);
     const query = searchParams.toString();
     router.push(query ? `/whatsapp-queue?${query}` : "/whatsapp-queue");
   }

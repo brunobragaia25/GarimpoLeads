@@ -1,5 +1,5 @@
 import axios from "axios";
-import { Lead } from "./types";
+import { Lead, Country } from "./types";
 
 const PLACES_BASE = "https://maps.googleapis.com/maps/api/place";
 
@@ -19,12 +19,12 @@ interface PlaceDetails {
   url?: string;
 }
 
-async function textSearch(query: string): Promise<TextSearchResult[]> {
+async function textSearch(query: string, language: string): Promise<TextSearchResult[]> {
   const { data } = await axios.get(`${PLACES_BASE}/textsearch/json`, {
     params: {
       query,
       key: process.env.GOOGLE_MAPS_API_KEY,
-      language: "pt-BR",
+      language,
     },
     timeout: REQUEST_TIMEOUT_MS,
   });
@@ -36,13 +36,13 @@ async function textSearch(query: string): Promise<TextSearchResult[]> {
   return data.results ?? [];
 }
 
-async function placeDetails(placeId: string): Promise<PlaceDetails> {
+async function placeDetails(placeId: string, language: string): Promise<PlaceDetails> {
   const { data } = await axios.get(`${PLACES_BASE}/details/json`, {
     params: {
       place_id: placeId,
       fields: "formatted_phone_number,website,url",
       key: process.env.GOOGLE_MAPS_API_KEY,
-      language: "pt-BR",
+      language,
     },
     timeout: REQUEST_TIMEOUT_MS,
   });
@@ -54,12 +54,14 @@ async function placeDetails(placeId: string): Promise<PlaceDetails> {
   return data.result ?? {};
 }
 
-export async function searchLeads(category: string, location: string): Promise<Lead[]> {
-  const results = await textSearch(`${category} em ${location}`);
+export async function searchLeads(category: string, location: string, country: Country = "BR"): Promise<Lead[]> {
+  const language = country === "US" ? "en" : "pt-BR";
+  const query = country === "US" ? `${category} in ${location}` : `${category} em ${location}`;
+  const results = await textSearch(query, language);
 
   const leads: Lead[] = [];
   for (const result of results) {
-    const details = await placeDetails(result.place_id);
+    const details = await placeDetails(result.place_id, language);
     leads.push({
       name: result.name,
       category,
@@ -68,6 +70,7 @@ export async function searchLeads(category: string, location: string): Promise<L
       website: details.website,
       google_maps_url: details.url,
       source: "google_maps",
+      country,
     });
   }
 
