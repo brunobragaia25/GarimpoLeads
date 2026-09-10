@@ -17,12 +17,13 @@ const WHATSAPP_AUTO_SEND_DISABLED = true;
 // mesmo que uma etapa individual demore mais que o previsto.
 const TIME_BUDGET_MS = 260_000;
 
-// Quantas combinações categoria+cidade rodar por dia. Reduzido de 10 pra 5:
-// o banco tem um backlog grande de leads que ainda não foram nem
-// analisados nem tiveram email buscado, então vale mais desacelerar a
-// entrada de leads novos e focar o orçamento de tempo em processar quem
-// já está esperando. O loop já para sozinho se o tempo apertar.
-const PAIRS_PER_DAY = 5;
+// Quantas combinações categoria+cidade rodar por dia, TOTAL somando todos
+// os países ativos (dividido entre eles - ver bloco de getProspectionConfig
+// mais abaixo). Era 5 (reduzido de 10 por causa do backlog de análise/email
+// pendente), mas agora que esse orçamento é repartido entre BR e EUA,
+// volta pra 10 pra cada país continuar com ~5/dia como antes. O loop já
+// para sozinho se o tempo apertar.
+const PAIRS_PER_DAY = 10;
 
 // Análise e busca de email agora rodam em paralelo (ver mapWithConcurrency
 // em pipeline.ts), então dá pra processar bem mais por dia dentro do mesmo
