@@ -122,10 +122,11 @@ export interface SiteAnalysisSummary {
   notes?: string | null;
 }
 
-function extractLoadSeconds(notes: string | null | undefined): string | null {
+function extractLoadSeconds(notes: string | null | undefined, locale: "pt" | "en" = "pt"): string | null {
   const match = notes?.match(/Carregou em (\d+)ms/);
   if (!match) return null;
-  return (Number(match[1]) / 1000).toFixed(1).replace(".", ",");
+  const formatted = (Number(match[1]) / 1000).toFixed(1);
+  return locale === "pt" ? formatted.replace(".", ",") : formatted;
 }
 
 // Converte os achados reais da análise do site (site_analysis) numa frase
@@ -170,6 +171,45 @@ export function buildProblemSummary(analysis: SiteAnalysisSummary | null): strin
   if (parts.length === 0) return "tem alguns pontos que dava pra melhorar";
   if (parts.length === 1) return parts[0];
   return `${parts.slice(0, -1).join(", ")} e ${parts[parts.length - 1]}`;
+}
+
+// Mesma lógica de buildProblemSummary, em inglês - usado nos templates dos
+// EUA. Duplicado em vez de traduzir em runtime porque as frases em
+// português já são texto livre, não dá pra virar {{var}} sem reescrever.
+export function buildProblemSummaryEN(analysis: SiteAnalysisSummary | null): string {
+  if (!analysis) return "there are a few things that could be improved";
+
+  if (analysis.is_broken) {
+    return analysis.broken_reason
+      ? `the site isn't even online - looks like ${analysis.broken_reason}`
+      : "the site isn't even online";
+  }
+
+  const parts: string[] = [];
+  if (analysis.is_slow || (analysis.performance_score !== null && analysis.performance_score < 50)) {
+    const seconds = extractLoadSeconds(analysis.notes, "en");
+    if (seconds && analysis.performance_score !== null) {
+      parts.push(
+        `the site takes ${seconds} seconds to load (performance score is only ${analysis.performance_score}/100)`
+      );
+    } else if (seconds) {
+      parts.push(`the site takes ${seconds} seconds to load`);
+    } else if (analysis.performance_score !== null) {
+      parts.push(`the site has a low performance score (${analysis.performance_score}/100)`);
+    } else {
+      parts.push("it loads pretty slowly");
+    }
+  }
+  if (analysis.is_outdated) {
+    parts.push("the design looks outdated");
+  }
+  if (analysis.is_wordpress) {
+    parts.push("it's built on WordPress, which tends to be heavier and more exposed to security issues");
+  }
+
+  if (parts.length === 0) return "there are a few things that could be improved";
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
 export interface TemplateLeadData {

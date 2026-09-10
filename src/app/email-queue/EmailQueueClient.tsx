@@ -11,6 +11,8 @@ export interface EmailQueueLead {
   address: string | null;
   email: string;
   website: string | null;
+  subject: string;
+  body: string;
 }
 
 export function EmailQueueClient({ leads }: { leads: EmailQueueLead[] }) {
@@ -20,7 +22,8 @@ export function EmailQueueClient({ leads }: { leads: EmailQueueLead[] }) {
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [doneCount, setDoneCount] = useState(0);
-  const [copied, setCopied] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState(false);
+  const [copiedMessage, setCopiedMessage] = useState(false);
 
   const current = queueLeads[index];
   const remaining = queueLeads.length - index;
@@ -36,18 +39,27 @@ export function EmailQueueClient({ leads }: { leads: EmailQueueLead[] }) {
     setLoading(false);
     setDoneCount((n) => n + 1);
     setIndex((i) => i + 1);
-    setCopied(false);
+    setCopiedEmail(false);
+    setCopiedMessage(false);
   }
 
   function skip() {
     setIndex((i) => i + 1);
-    setCopied(false);
+    setCopiedEmail(false);
+    setCopiedMessage(false);
   }
 
   async function copyEmail() {
     if (!current) return;
     await navigator.clipboard.writeText(current.email);
-    setCopied(true);
+    setCopiedEmail(true);
+  }
+
+  async function copyMessage() {
+    if (!current) return;
+    const text = current.subject ? `${current.subject}\n\n${current.body}` : current.body;
+    await navigator.clipboard.writeText(text);
+    setCopiedMessage(true);
   }
 
   // Mesma lógica da fila de WhatsApp: exclui de vez, sem precisar voltar
@@ -119,22 +131,40 @@ export function EmailQueueClient({ leads }: { leads: EmailQueueLead[] }) {
           )}
         </div>
 
-        <div className="mt-4 flex items-center gap-2 rounded-lg bg-zinc-50 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-          <Mail className="h-4 w-4 shrink-0 text-zinc-400" />
-          <span className="font-medium">{current.email}</span>
+        <div className="mt-4 flex items-center justify-between gap-2 rounded-lg bg-zinc-50 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+          <div className="flex items-center gap-2">
+            <Mail className="h-4 w-4 shrink-0 text-zinc-400" />
+            <span className="font-medium">{current.email}</span>
+          </div>
+          <button
+            onClick={copyEmail}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            {copiedEmail ? "Copiado!" : "Copiar"}
+          </button>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+          {current.subject && (
+            <p className="mb-2 text-sm font-medium text-zinc-900 dark:text-zinc-50">
+              Assunto: {current.subject}
+            </p>
+          )}
+          <p className="whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">{current.body}</p>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <button
-            onClick={copyEmail}
+            onClick={copyMessage}
             className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700"
           >
             <Copy className="h-4 w-4" />
-            {copied ? "Copiado!" : "Copiar e-mail"}
+            {copiedMessage ? "Copiado!" : "Copiar mensagem"}
           </button>
 
           <a
-            href={`mailto:${current.email}`}
+            href={`mailto:${current.email}?subject=${encodeURIComponent(current.subject)}&body=${encodeURIComponent(current.body)}`}
             className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
           >
             <Mail className="h-4 w-4" />

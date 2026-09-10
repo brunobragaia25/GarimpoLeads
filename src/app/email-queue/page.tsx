@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getLeadsWithDetails } from "@/lib/leads";
+import { buildProblemSummary, buildProblemSummaryEN, getTemplate, renderTemplate } from "@/lib/template";
 import { PageHeader } from "../PageHeader";
 import { EmailQueueClient, type EmailQueueLead } from "./EmailQueueClient";
 import { Mail } from "lucide-react";
@@ -48,14 +49,40 @@ export default async function EmailQueuePage({
     (l) => categoryFilter === "all" || l.category === categoryFilter
   );
 
-  const queue: EmailQueueLead[] = pending.map((lead) => ({
-    id: lead.id,
-    name: lead.name,
-    category: lead.category,
-    address: lead.address,
-    email: lead.email!,
-    website: lead.website,
-  }));
+  const categoriesNeedingTemplate = [...new Set(pending.map((l) => l.category))];
+  const templateByCategory = new Map(
+    await Promise.all(categoriesNeedingTemplate.map(async (c) => [c, await getTemplate(c)] as const))
+  );
+
+  const queue: EmailQueueLead[] = pending.map((lead) => {
+    const template = templateByCategory.get(lead.category)!;
+    const problem = (countryFilter === "US" ? buildProblemSummaryEN : buildProblemSummary)({
+      performance_score: lead.performance_score,
+      is_slow: lead.is_slow,
+      is_outdated: lead.is_outdated,
+      is_wordpress: lead.is_wordpress,
+      is_broken: lead.is_broken,
+      broken_reason: lead.broken_reason,
+      notes: lead.site_notes,
+    });
+    const rendered = renderTemplate(template, {
+      name: lead.name,
+      category: lead.category,
+      address: lead.address,
+      problem,
+    });
+
+    return {
+      id: lead.id,
+      name: lead.name,
+      category: lead.category,
+      address: lead.address,
+      email: lead.email!,
+      website: lead.website,
+      subject: rendered.subject,
+      body: rendered.body,
+    };
+  });
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-black">
