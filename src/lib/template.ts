@@ -16,20 +16,27 @@ const DEFAULT_TEMPLATE: MessageTemplate = {
 };
 
 export const FOLLOWUP_CATEGORY = "__followup__";
+export const FOLLOWUP_CATEGORY_US = "__followup_us__";
 
 const DEFAULT_FOLLOWUP_TEMPLATE: MessageTemplate = {
   subject: "Re: sobre o site da {{empresa}}",
   body: "Oi, tudo bem?\n\nPassando só pra saber se você chegou a ver meu email anterior sobre o site da {{empresa}}. Fico à disposição se quiser trocar uma ideia.\n\nAbraço,\nBruno",
 };
 
-export async function getFollowUpTemplate(): Promise<MessageTemplate> {
+const DEFAULT_FOLLOWUP_TEMPLATE_US: MessageTemplate = {
+  subject: "Re: about {{empresa}}'s website",
+  body: "Hi again,\n\nJust checking if you had a chance to see my previous email about {{empresa}}'s website. Happy to chat if you're interested.\n\nBest,\nBruno",
+};
+
+export async function getFollowUpTemplate(country: "BR" | "US" = "BR"): Promise<MessageTemplate> {
+  const category = country === "US" ? FOLLOWUP_CATEGORY_US : FOLLOWUP_CATEGORY;
   const { data } = await supabase
     .from("message_templates")
     .select("subject, body")
-    .eq("category", FOLLOWUP_CATEGORY)
+    .eq("category", category)
     .maybeSingle();
 
-  return data ?? DEFAULT_FOLLOWUP_TEMPLATE;
+  return data ?? (country === "US" ? DEFAULT_FOLLOWUP_TEMPLATE_US : DEFAULT_FOLLOWUP_TEMPLATE);
 }
 
 // Mensagem que abre pré-preenchida no botão de WhatsApp dos leads sem site
@@ -108,8 +115,14 @@ export async function saveTemplate(
 
 function extractCity(address: string | null): string {
   if (!address) return "";
-  const match = address.match(/,\s*([^,]+?)\s*-\s*[A-Z]{2},/);
-  return match ? match[1].trim() : "";
+  // Formato BR: "Rua X, Cidade - UF, CEP". Formato EUA (Google Places em
+  // inglês): "Street, City, ST ZIP[, USA]" - sem traço antes da sigla do
+  // estado, então precisa de um padrão à parte.
+  const brMatch = address.match(/,\s*([^,]+?)\s*-\s*[A-Z]{2},/);
+  if (brMatch) return brMatch[1].trim();
+  const usMatch = address.match(/,\s*([^,]+?),\s*[A-Z]{2}\s+\d{5}/);
+  if (usMatch) return usMatch[1].trim();
+  return "";
 }
 
 export interface SiteAnalysisSummary {

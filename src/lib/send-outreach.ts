@@ -4,12 +4,24 @@ import {
   getFollowUpTemplate,
   renderTemplate,
   buildProblemSummary,
+  buildProblemSummaryEN,
   type MessageTemplate,
   type SiteAnalysisSummary,
 } from "./template";
 import { sendOutreachEmail } from "./resend";
 import { createUnsubscribeToken } from "./unsubscribe";
 import { startOfTodayBrasiliaISO } from "./timezone";
+import type { Country } from "./types";
+
+function buildProblem(country: Country, analysis: SiteAnalysisSummary | null): string {
+  return country === "US" ? buildProblemSummaryEN(analysis) : buildProblemSummary(analysis);
+}
+
+function appendUnsubscribeFooter(body: string, link: string, country: Country): string {
+  return country === "US"
+    ? `${body}\n\n---\nIf you'd rather not get these emails, click here: ${link}`
+    : `${body}\n\n---\nSe não quiser mais receber esses emails, clique aqui: ${link}`;
+}
 
 // Busca a análise mais recente de cada lead (pode ter mais de uma linha ao
 // longo do tempo) e devolve um Map lead_id -> achados, pra montar o
@@ -75,12 +87,8 @@ async function countSentToday(): Promise<number> {
   return (initial ?? 0) + (followUps ?? 0);
 }
 
-function unsubscribeLink(leadId: string, token: string): string {
-  return `${process.env.APP_URL}/api/unsubscribe?lead=${leadId}&token=${token}`;
-}
-
-function appendUnsubscribeFooter(body: string, link: string): string {
-  return `${body}\n\n---\nSe não quiser mais receber esses emails, clique aqui: ${link}`;
+function unsubscribeLink(leadId: string, token: string, country: Country): string {
+  return `${process.env.APP_URL}/api/unsubscribe?lead=${leadId}&token=${token}&country=${country}`;
 }
 
 export async function sendPendingOutreach(limit = 100, leadId?: string, deadline = Infinity) {
@@ -104,7 +112,7 @@ export async function sendPendingOutreach(limit = 100, leadId?: string, deadline
 
   let query = supabase
     .from("outreach")
-    .select("id, lead_id, email, leads(name, category, address)")
+    .select("id, lead_id, email, leads(name, category, address, country)")
     .eq("status", "pending")
     .not("email", "is", null)
     .order("created_at", { ascending: true });
@@ -131,16 +139,17 @@ export async function sendPendingOutreach(limit = 100, leadId?: string, deadline
     const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads;
     if (!lead || !row.email) continue;
 
+    const country: Country = lead.country === "US" ? "US" : "BR";
     const template = await resolveTemplate(lead.category);
     const rendered = renderTemplate(template, {
       name: lead.name,
       category: lead.category,
       address: lead.address,
-      problem: buildProblemSummary(analysisByLead.get(row.lead_id) ?? null),
+      problem: buildProblem(country, analysisByLead.get(row.lead_id) ?? null),
     });
     const token = await createUnsubscribeToken(row.lead_id);
-    const link = unsubscribeLink(row.lead_id, token);
-    const bodyWithFooter = appendUnsubscribeFooter(rendered.body, link);
+    const link = unsubscribeLink(row.lead_id, token, country);
+    const bodyWithFooter = appendUnsubscribeFooter(rendered.body, link, country);
 
     try {
       await sendOutreachEmail(row.email, rendered.subject, bodyWithFooter, link);
@@ -186,7 +195,7 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = In
 
   const { data: rows, error } = await supabase
     .from("outreach")
-    .select("id, lead_id, email, leads(name, category, address)")
+    .select("id, lead_id, email, leads(name, category, address, country)")
     .eq("status", "contacted")
     .is("follow_up_sent_at", null)
     .lte("contacted_at", cutoff.toISOString())
@@ -196,7 +205,10 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = In
 
   if (error) throw new Error(error.message);
 
-  const template = await getFollowUpTemplate();
+  const followUpTemplateByCountry = {
+    BR: await getFollowUpTemplate("BR"),
+    US: await getFollowUpTemplate("US"),
+  };
   const analysisByLead = await fetchLatestAnalysisByLead((rows ?? []).map((r) => r.lead_id));
   let sent = 0;
   let failed = 0;
@@ -207,15 +219,16 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = In
     const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads;
     if (!lead || !row.email) continue;
 
-    const rendered = renderTemplate(template, {
+    const country: Country = lead.country === "US" ? "US" : "BR";
+    const rendered = renderTemplate(followUpTemplateByCountry[country], {
       name: lead.name,
       category: lead.category,
       address: lead.address,
-      problem: buildProblemSummary(analysisByLead.get(row.lead_id) ?? null),
+      problem: buildProblem(country, analysisByLead.get(row.lead_id) ?? null),
     });
     const token = await createUnsubscribeToken(row.lead_id);
-    const link = unsubscribeLink(row.lead_id, token);
-    const bodyWithFooter = appendUnsubscribeFooter(rendered.body, link);
+    const link = unsubscribeLink(row.lead_id, token, country);
+    const bodyWithFooter = appendUnsubscribeFooter(rendered.body, link, country);
 
     try {
       await sendOutreachEmail(row.email, rendered.subject, bodyWithFooter, link);

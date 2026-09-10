@@ -2,15 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe";
 
-function htmlPage(body: string) {
-  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/><title>Descadastro</title></head>
+type Country = "BR" | "US";
+
+function getCountry(req: NextRequest): Country {
+  return req.nextUrl.searchParams.get("country") === "US" ? "US" : "BR";
+}
+
+function htmlPage(body: string, country: Country) {
+  const lang = country === "US" ? "en" : "pt-BR";
+  const title = country === "US" ? "Unsubscribe" : "Descadastro";
+  return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"/><title>${title}</title></head>
 <body style="font-family: sans-serif; max-width: 480px; margin: 80px auto; text-align: center; color: #333;">
 ${body}
 </body></html>`;
 }
 
-function htmlResponse(body: string, status = 200) {
-  return new NextResponse(htmlPage(body), {
+function htmlResponse(body: string, country: Country, status = 200) {
+  return new NextResponse(htmlPage(body, country), {
     status,
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
@@ -30,20 +38,31 @@ async function validLeadId(req: NextRequest): Promise<string | null> {
 // GETs automaticamente ao escanear a mensagem, então descadastrar direto
 // aqui geraria descadastros falsos. O clique no botão faz o POST real.
 export async function GET(req: NextRequest) {
+  const country = getCountry(req);
   const leadId = await validLeadId(req);
   if (!leadId) {
-    return htmlResponse(`<h1 style="font-size: 20px;">Link inválido.</h1>`, 400);
+    return htmlResponse(
+      `<h1 style="font-size: 20px;">${country === "US" ? "Invalid link." : "Link inválido."}</h1>`,
+      country,
+      400
+    );
   }
 
   const action = `/api/unsubscribe?lead=${encodeURIComponent(leadId)}&token=${encodeURIComponent(
     req.nextUrl.searchParams.get("token")!
-  )}`;
+  )}&country=${country}`;
 
   return htmlResponse(
-    `<h1 style="font-size: 20px;">Deseja parar de receber nossos emails?</h1>
+    country === "US"
+      ? `<h1 style="font-size: 20px;">Want to stop receiving our emails?</h1>
+<form method="POST" action="${action}">
+<button type="submit" style="margin-top: 16px; padding: 10px 24px; font-size: 15px; cursor: pointer; background: #111; color: #fff; border: none; border-radius: 6px;">Yes, unsubscribe me</button>
+</form>`
+      : `<h1 style="font-size: 20px;">Deseja parar de receber nossos emails?</h1>
 <form method="POST" action="${action}">
 <button type="submit" style="margin-top: 16px; padding: 10px 24px; font-size: 15px; cursor: pointer; background: #111; color: #fff; border: none; border-radius: 6px;">Sim, cancelar inscrição</button>
-</form>`
+</form>`,
+    country
   );
 }
 
@@ -53,9 +72,14 @@ export async function GET(req: NextRequest) {
 // List-Unsubscribe=One-Click. Clientes de email só olham o status HTTP,
 // então retornar HTML aqui não atrapalha o one-click.
 export async function POST(req: NextRequest) {
+  const country = getCountry(req);
   const leadId = await validLeadId(req);
   if (!leadId) {
-    return htmlResponse(`<h1 style="font-size: 20px;">Link inválido.</h1>`, 400);
+    return htmlResponse(
+      `<h1 style="font-size: 20px;">${country === "US" ? "Invalid link." : "Link inválido."}</h1>`,
+      country,
+      400
+    );
   }
 
   const { error } = await supabase
@@ -65,12 +89,22 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     return htmlResponse(
-      `<h1 style="font-size: 20px;">Erro ao processar seu pedido. Tente novamente.</h1>`,
+      `<h1 style="font-size: 20px;">${
+        country === "US"
+          ? "Error processing your request. Please try again."
+          : "Erro ao processar seu pedido. Tente novamente."
+      }</h1>`,
+      country,
       500
     );
   }
 
   return htmlResponse(
-    `<h1 style="font-size: 20px;">Você não receberá mais emails nossos. Pedimos desculpas pelo incômodo.</h1>`
+    `<h1 style="font-size: 20px;">${
+      country === "US"
+        ? "You won't receive any more emails from us. Sorry for the inconvenience."
+        : "Você não receberá mais emails nossos. Pedimos desculpas pelo incômodo."
+    }</h1>`,
+    country
   );
 }
