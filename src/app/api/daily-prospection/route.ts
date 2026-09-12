@@ -140,25 +140,37 @@ export async function GET(req: NextRequest) {
       errors.push("find-emails: pulado por falta de tempo");
     }
 
+    // Envio (inicial e follow-up) dividido igualmente entre BR e EUA - sem
+    // isso, a ordem por mais antigo faz o backlog bem maior do BR consumir
+    // a cota diaria inteira todo santo dia e o EUA nunca ser alcancado
+    // (foi exatamente isso que aconteceu no primeiro dia com envio ligado).
+    const SEND_COUNTRIES: Country[] = ["BR", "US"];
+    const emailLimitPerCountry = Math.ceil(EMAIL_SEND_LIMIT_PER_DAY / SEND_COUNTRIES.length);
+    const followUpLimitPerCountry = Math.ceil(FOLLOWUP_LIMIT_PER_DAY / SEND_COUNTRIES.length);
+
     if (timeLeft() > 10_000) {
-      try {
-        const outreachResult = await sendPendingOutreach(EMAIL_SEND_LIMIT_PER_DAY, undefined, deadline);
-        emailsSent = outreachResult.sent;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "erro desconhecido";
-        errors.push(`send-outreach: ${message}`);
+      for (const country of SEND_COUNTRIES) {
+        try {
+          const outreachResult = await sendPendingOutreach(emailLimitPerCountry, undefined, deadline, country);
+          emailsSent += outreachResult.sent;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "erro desconhecido";
+          errors.push(`send-outreach-${country}: ${message}`);
+        }
       }
     } else {
       errors.push("send-outreach: pulado por falta de tempo");
     }
 
     if (timeLeft() > 10_000) {
-      try {
-        const followUpResult = await sendFollowUps(FOLLOWUP_DAYS_THRESHOLD, FOLLOWUP_LIMIT_PER_DAY, deadline);
-        followUpsSent = followUpResult.sent;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "erro desconhecido";
-        errors.push(`follow-ups: ${message}`);
+      for (const country of SEND_COUNTRIES) {
+        try {
+          const followUpResult = await sendFollowUps(FOLLOWUP_DAYS_THRESHOLD, followUpLimitPerCountry, deadline, country);
+          followUpsSent += followUpResult.sent;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "erro desconhecido";
+          errors.push(`follow-ups-${country}: ${message}`);
+        }
       }
     } else {
       errors.push("follow-ups: pulado por falta de tempo");

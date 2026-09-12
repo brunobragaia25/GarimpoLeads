@@ -193,7 +193,7 @@ export async function sendPendingOutreach(
 
 // Reenvia pra quem foi contatado há mais de `daysThreshold` dias e ainda não
 // recebeu follow-up. Compartilha a mesma cota diária dos envios iniciais.
-export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = Infinity) {
+export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = Infinity, country?: Country) {
   const dailyLimit = Number(process.env.SEND_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
   const alreadySentToday = await countSentToday();
   const remainingToday = Math.max(0, dailyLimit - alreadySentToday);
@@ -206,15 +206,21 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = In
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - daysThreshold);
 
-  const { data: rows, error } = await supabase
+  let query = supabase
     .from("outreach")
-    .select("id, lead_id, email, leads(name, category, address, country)")
+    .select(country ? "id, lead_id, email, leads!inner(name, category, address, country)" : "id, lead_id, email, leads(name, category, address, country)")
     .eq("status", "contacted")
     .is("follow_up_sent_at", null)
     .lte("contacted_at", cutoff.toISOString())
     .not("email", "is", null)
     .order("contacted_at", { ascending: true })
     .limit(effectiveLimit);
+
+  if (country) {
+    query = query.eq("leads.country", country);
+  }
+
+  const { data: rows, error } = await query;
 
   if (error) throw new Error(error.message);
 
