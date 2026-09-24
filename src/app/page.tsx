@@ -246,7 +246,7 @@ export default async function Home({
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
   const allLeadsUnfiltered = await getLeadsWithDetails();
-  const whatsappTemplate = await getWhatsappNoSiteTemplate();
+  const whatsappTemplate = await getWhatsappNoSiteTemplate(countryFilter);
 
   const brCount = allLeadsUnfiltered.filter((l) => l.country === "BR").length;
   const usCount = allLeadsUnfiltered.filter((l) => l.country === "US").length;

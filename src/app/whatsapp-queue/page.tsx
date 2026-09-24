@@ -41,7 +41,7 @@ export default async function WhatsappQueuePage({
   const countryFilter: Country = params.country === "US" ? "US" : "BR";
 
   const allLeads = await getLeadsWithDetails();
-  const whatsappTemplate = await getWhatsappNoSiteTemplate();
+  const whatsappTemplate = await getWhatsappNoSiteTemplate(countryFilter);
 
   const brCount = allLeads.filter((l) => l.country === "BR").length;
   const usCount = allLeads.filter((l) => l.country === "US").length;
@@ -72,6 +72,10 @@ export default async function WhatsappQueuePage({
       (siteFilter === "all" || (siteFilter === "with" ? !!l.website : !l.website)) &&
       (categoryFilter === "all" || l.category === categoryFilter)
   );
+
+  // Empresas sem site vem primeiro (foco atual da abordagem); a ordenacao
+  // do JS e estavel, entao dentro de cada grupo a ordem original continua.
+  pending.sort((a, b) => Number(!!a.website) - Number(!!b.website));
 
   const categoriesNeedingDefaultTemplate = [
     ...new Set(pending.filter((l) => l.website).map((l) => l.category)),

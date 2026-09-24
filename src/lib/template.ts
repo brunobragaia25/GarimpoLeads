@@ -48,14 +48,22 @@ const DEFAULT_WHATSAPP_NO_SITE_TEMPLATE: MessageTemplate = {
   body: "Oi! Tudo bem? Meu nome é Bruno, da DevzDesign 🙂 Vi que a {{empresa}} ainda não tem site, e isso pode estar fazendo vocês perderem clientes que buscam por aí no Google. Posso te mostrar rapidinho como resolveríamos isso, sem compromisso?",
 };
 
-export async function getWhatsappNoSiteTemplate(): Promise<MessageTemplate> {
+export const NO_SITE_CATEGORY_US = "__no_site_us__";
+
+const DEFAULT_NO_SITE_TEMPLATE_US: MessageTemplate = {
+  subject: "A website for {{empresa}}",
+  body: "Hi! My name is Bruno, I'm with DevzDesign (www.devzdesign.com.br). We build websites, and we're reaching out to businesses that are well rated on Google but don't have a website yet - which is an important channel for getting new customers.\n\nWe've built a website for your business and wanted to know if you'd be interested in at least taking a look. We can talk about pricing at a later stage.\n\nWhat do you think?",
+};
+
+export async function getWhatsappNoSiteTemplate(country: "BR" | "US" = "BR"): Promise<MessageTemplate> {
+  const category = country === "US" ? NO_SITE_CATEGORY_US : WHATSAPP_NO_SITE_CATEGORY;
   const { data } = await supabase
     .from("message_templates")
     .select("subject, body")
-    .eq("category", WHATSAPP_NO_SITE_CATEGORY)
+    .eq("category", category)
     .maybeSingle();
 
-  return data ?? DEFAULT_WHATSAPP_NO_SITE_TEMPLATE;
+  return data ?? (country === "US" ? DEFAULT_NO_SITE_TEMPLATE_US : DEFAULT_WHATSAPP_NO_SITE_TEMPLATE);
 }
 
 export async function listTemplates(): Promise<StoredTemplate[]> {
