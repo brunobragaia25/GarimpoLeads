@@ -17,7 +17,34 @@ export async function PATCH(
   }
 
   const { id: leadId } = await params;
-  const { phone } = await req.json().catch(() => ({}));
+  const { phone, email } = await req.json().catch(() => ({}));
+
+  // E-mail achado na mao (lead sem site, onde a raspagem nao acha nada):
+  // grava/atualiza a linha de outreach do lead. Vazio limpa o e-mail.
+  if (typeof email === "string") {
+    const trimmed = email.trim();
+    if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      return NextResponse.json({ error: "E-mail inválido" }, { status: 400 });
+    }
+
+    const { data: existing } = await supabase
+      .from("outreach")
+      .select("id")
+      .eq("lead_id", leadId)
+      .maybeSingle();
+
+    const { error } = existing
+      ? await supabase.from("outreach").update({ email: trimmed || null }).eq("id", existing.id)
+      : await supabase.from("outreach").insert({
+          lead_id: leadId,
+          email: trimmed || null,
+          status: "pending",
+          notes: "Fonte: manual",
+        });
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
 
   if (typeof phone !== "string") {
     return NextResponse.json({ error: "Telefone inválido" }, { status: 400 });

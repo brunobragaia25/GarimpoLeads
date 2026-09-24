@@ -9,6 +9,7 @@ import {
 import { SendOutreachButton } from "./SendOutreachButton";
 import {
   DeleteLeadButton,
+  EditableEmail,
   EditablePhone,
   IgnoreButton,
   PipelineStageSelect,
@@ -542,6 +543,17 @@ export default async function Home({
                     </td>
                     <td className="max-w-[220px] truncate px-4 py-3 font-medium text-zinc-900 dark:text-zinc-50">
                       {lead.name}
+                      {lead.google_maps_url && (
+                        <a
+                          href={lead.google_maps_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Abrir no Google Maps"
+                          className="ml-1.5 text-xs font-normal text-blue-600 hover:underline dark:text-blue-400"
+                        >
+                          Maps
+                        </a>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-zinc-600 dark:text-zinc-400">
                       {lead.category}
@@ -615,7 +627,7 @@ export default async function Home({
                       )}
                     </td>
                     <td className="max-w-[200px] truncate px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                      {lead.email ?? "-"}
+                      <EditableEmail leadId={lead.id} email={lead.email} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">

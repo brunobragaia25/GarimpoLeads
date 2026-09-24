@@ -115,16 +115,19 @@ export async function sendPendingOutreach(
     };
   }
 
-  // `!inner` faz o filtro em leads.country valer de verdade (join normal
-  // deixaria a linha de outreach passar mesmo sem bater o filtro do lado
-  // relacionado) - so usado em chamadas manuais pra atacar um pais
-  // especifico sem depender da ordem (que privilegia o lead mais antigo,
-  // ou seja, o backlog de outro pais).
+  // `!inner` faz os filtros em leads.* (website, country) valerem de verdade
+  // - join normal deixaria a linha de outreach passar mesmo sem bater o
+  // filtro do lado relacionado. O filtro de pais e usado pelo cron (metade
+  // da cota pra cada pais) e em chamadas manuais.
   let query = supabase
     .from("outreach")
-    .select(country ? "id, lead_id, email, leads!inner(name, category, address, country)" : "id, lead_id, email, leads(name, category, address, country)")
+    .select("id, lead_id, email, leads!inner(name, category, address, country, website)")
     .eq("status", "pending")
     .not("email", "is", null)
+    // Automatico so pra lead COM site: o texto fala "dei uma olhada no seu
+    // site". Lead sem site (e-mail cadastrado na mao) recebe o pitch de
+    // site novo, manualmente, pela Fila de Email.
+    .not("leads.website", "is", null)
     .order("created_at", { ascending: true });
 
   if (leadId) {
@@ -208,9 +211,10 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = In
 
   let query = supabase
     .from("outreach")
-    .select(country ? "id, lead_id, email, leads!inner(name, category, address, country)" : "id, lead_id, email, leads(name, category, address, country)")
+    .select("id, lead_id, email, leads!inner(name, category, address, country, website)")
     .eq("status", "contacted")
     .is("follow_up_sent_at", null)
+    .not("leads.website", "is", null)
     .lte("contacted_at", cutoff.toISOString())
     .not("email", "is", null)
     .order("contacted_at", { ascending: true })

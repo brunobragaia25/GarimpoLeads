@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { getLeadsWithDetails } from "@/lib/leads";
-import { buildProblemSummary, buildProblemSummaryEN, getTemplate, renderTemplate } from "@/lib/template";
+import {
+  buildProblemSummary,
+  buildProblemSummaryEN,
+  getTemplate,
+  getWhatsappNoSiteTemplate,
+  renderTemplate,
+} from "@/lib/template";
 import { PageHeader } from "../PageHeader";
 import { EmailQueueClient, type EmailQueueLead } from "./EmailQueueClient";
 import { Mail } from "lucide-react";
@@ -49,13 +55,17 @@ export default async function EmailQueuePage({
     (l) => categoryFilter === "all" || l.category === categoryFilter
   );
 
+  const noSiteTemplate = await getWhatsappNoSiteTemplate(countryFilter);
   const categoriesNeedingTemplate = [...new Set(pending.map((l) => l.category))];
   const templateByCategory = new Map(
     await Promise.all(categoriesNeedingTemplate.map(async (c) => [c, await getTemplate(c)] as const))
   );
 
   const queue: EmailQueueLead[] = pending.map((lead) => {
-    const template = templateByCategory.get(lead.category)!;
+    // Sem site de verdade (nada ou so link de rede social): pitch de site
+    // novo, em vez do texto que comenta o site existente.
+    const noSite = !lead.website || lead.social_platform !== null;
+    const template = noSite ? noSiteTemplate : templateByCategory.get(lead.category)!;
     const problem = (countryFilter === "US" ? buildProblemSummaryEN : buildProblemSummary)({
       performance_score: lead.performance_score,
       is_slow: lead.is_slow,
