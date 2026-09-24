@@ -6,6 +6,8 @@ import { MessageSquareText, Save, Check, Info } from "lucide-react";
 
 const FOLLOWUP_CATEGORY = "__followup__";
 const WHATSAPP_NO_SITE_CATEGORY = "__whatsapp_no_site__";
+const DEFAULT_US_CATEGORY = "__default_us__";
+const NO_SITE_US_CATEGORY = "__no_site_us__";
 
 type Country = "BR" | "US";
 
@@ -41,7 +43,13 @@ export default function TemplatePage() {
         .map((t: { category: string | null }) => t.category)
         .filter(
           (c: string | null): c is string =>
-            !!c && !known.has(c) && c !== FOLLOWUP_CATEGORY && c !== WHATSAPP_NO_SITE_CATEGORY
+            !!c &&
+              !known.has(c) &&
+              c !== FOLLOWUP_CATEGORY &&
+              c !== WHATSAPP_NO_SITE_CATEGORY &&
+              c !== DEFAULT_US_CATEGORY &&
+              c !== NO_SITE_US_CATEGORY &&
+              !c.startsWith("__")
         );
 
       setCategoriesByCountry({
@@ -72,7 +80,7 @@ export default function TemplatePage() {
 
   function handleCountryChange(newCountry: Country) {
     setCountry(newCountry);
-    handleCategoryChange("");
+    handleCategoryChange(newCountry === "US" ? DEFAULT_US_CATEGORY : "");
   }
 
   async function handleSave() {
@@ -149,7 +157,7 @@ export default function TemplatePage() {
             onChange={(e) => handleCategoryChange(e.target.value)}
             className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
           >
-            <option value="">Padrão (todas as categorias)</option>
+            <option value={country === "US" ? DEFAULT_US_CATEGORY : ""}>Padrão (todas as categorias)</option>
             {allCategories.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -167,8 +175,8 @@ export default function TemplatePage() {
               ? "Enviado automaticamente pra quem foi contatado há 5+ dias e não recebeu follow-up ainda. Se não configurar, usa um texto padrão simples."
               : category === WHATSAPP_NO_SITE_CATEGORY
                 ? "Texto que já vem preenchido ao clicar no botão de WhatsApp de um lead sem site, no dashboard."
-                : category === "" && country === "US"
-                  ? 'O "Padrão" é compartilhado com o Brasil (hoje em português) - toda categoria dos EUA já tem template próprio em inglês, então normalmente não é usado.'
+                : category === DEFAULT_US_CATEGORY
+                  ? 'Texto padrão dos EUA: usado por toda categoria dos EUA que não tiver template próprio.'
                   : 'Se uma categoria não tiver template próprio, usa o "Padrão" na hora de enviar.'}
           </p>
 

@@ -58,7 +58,7 @@ export default async function EmailQueuePage({
   const noSiteTemplate = await getWhatsappNoSiteTemplate(countryFilter);
   const categoriesNeedingTemplate = [...new Set(pending.map((l) => l.category))];
   const templateByCategory = new Map(
-    await Promise.all(categoriesNeedingTemplate.map(async (c) => [c, await getTemplate(c)] as const))
+    await Promise.all(categoriesNeedingTemplate.map(async (c) => [c, await getTemplate(c, countryFilter)] as const))
   );
 
   const queue: EmailQueueLead[] = pending.map((lead) => {

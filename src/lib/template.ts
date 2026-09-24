@@ -11,8 +11,17 @@ export interface StoredTemplate extends MessageTemplate {
 }
 
 const DEFAULT_TEMPLATE: MessageTemplate = {
-  subject: "Sobre o site da {{empresa}}",
-  body: "Oi, tudo bem?\n\nSou o Bruno, da DevzDesign (devzdesign.com.br) - trabalho com modernização de sites.\n\nDei uma olhada no site da {{empresa}} e reparei que {{problema}}. Isso pode estar afastando quem pesquisa por {{categoria}} em {{cidade}} e acaba indo pro concorrente.\n\nSe fizer sentido, posso te mostrar rapidinho o que notei, sem compromisso.\n\nAbraço,\nBruno Bragaia\nDevzDesign",
+  subject: "Uma nova versão do site da {{empresa}}",
+  body: "Olá! Eu me chamo Bruno e sou da DevzDesign (www.devzdesign.com.br), nós trabalhamos com desenvolvimento de websites.\n\nDei uma olhada no site da {{empresa}} e reparei que {{problema}}. Isso pode estar afastando quem pesquisa por {{categoria}} em {{cidade}}.\n\nNós desenvolvemos uma nova versão do site da sua empresa e queríamos saber se você está interessado em pelo menos ver, o preço falamos em um segundo momento.\n\nO que acha?\n\nAbraço,\nBruno Bragaia\nDevzDesign",
+};
+
+// Padrao dos EUA (categoria sem template proprio) - separado do padrao do BR
+// pra uma categoria nova dos EUA nunca cair num texto em portugues.
+export const DEFAULT_CATEGORY_US = "__default_us__";
+
+const DEFAULT_TEMPLATE_US: MessageTemplate = {
+  subject: "A new version of {{empresa}}'s website",
+  body: "Hi! My name is Bruno, I'm with DevzDesign (www.devzdesign.com.br). We build websites.\n\nI took a look at {{empresa}}'s website and noticed that {{problema}}. That could be turning away people searching for {{categoria}} in {{cidade}}.\n\nWe've built a new version of your website and wanted to know if you'd be interested in at least taking a look. We can talk about pricing at a later stage.\n\nWhat do you think?\n\nBest,\nBruno",
 };
 
 export const FOLLOWUP_CATEGORY = "__followup__";
@@ -75,7 +84,10 @@ export async function listTemplates(): Promise<StoredTemplate[]> {
   return data ?? [];
 }
 
-export async function getTemplate(category?: string | null): Promise<MessageTemplate> {
+export async function getTemplate(
+  category?: string | null,
+  country: "BR" | "US" = "BR"
+): Promise<MessageTemplate> {
   if (category) {
     const { data: specific } = await supabase
       .from("message_templates")
@@ -83,6 +95,15 @@ export async function getTemplate(category?: string | null): Promise<MessageTemp
       .eq("category", category)
       .maybeSingle();
     if (specific) return specific;
+  }
+
+  if (country === "US" || category === DEFAULT_CATEGORY_US) {
+    const { data: usDefault } = await supabase
+      .from("message_templates")
+      .select("subject, body")
+      .eq("category", DEFAULT_CATEGORY_US)
+      .maybeSingle();
+    return usDefault ?? DEFAULT_TEMPLATE_US;
   }
 
   const { data: fallback } = await supabase

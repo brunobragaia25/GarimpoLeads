@@ -340,7 +340,7 @@ export default async function Home({
   const defaultTemplateByCategory = new Map(
     await Promise.all(
       categoriesNeedingDefaultTemplate.map(
-        async (c) => [c, await getTemplate(c)] as const
+        async (c) => [c, await getTemplate(c, countryFilter)] as const
       )
     )
   );

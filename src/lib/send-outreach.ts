@@ -44,11 +44,12 @@ async function fetchLatestAnalysisByLead(leadIds: string[]): Promise<Map<string,
 
 async function buildTemplateResolver() {
   const cache = new Map<string, MessageTemplate>();
-  return async (category: string): Promise<MessageTemplate> => {
-    if (!cache.has(category)) {
-      cache.set(category, await getTemplate(category));
+  return async (category: string, country: Country): Promise<MessageTemplate> => {
+    const key = `${country}:${category}`;
+    if (!cache.has(key)) {
+      cache.set(key, await getTemplate(category, country));
     }
-    return cache.get(category)!;
+    return cache.get(key)!;
   };
 }
 
@@ -156,7 +157,7 @@ export async function sendPendingOutreach(
     if (!lead || !row.email) continue;
 
     const country: Country = lead.country === "US" ? "US" : "BR";
-    const template = await resolveTemplate(lead.category);
+    const template = await resolveTemplate(lead.category, country);
     const rendered = renderTemplate(template, {
       name: lead.name,
       category: lead.category,
