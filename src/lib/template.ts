@@ -171,6 +171,43 @@ function extractLoadSeconds(notes: string | null | undefined, locale: "pt" | "en
   return locale === "pt" ? formatted.replace(".", ",") : formatted;
 }
 
+// Frase limpa pro motivo de "site quebrado", ou null quando o motivo nao e
+// confiavel o bastante pra afirmar num e-mail (ex: pagina "vazia" de site
+// feito em JavaScript, erro tecnico solto) - nesse caso o e-mail segue pro
+// resto da analise em vez de acusar algo que pode ser falso. Nunca devolve
+// o texto tecnico do erro.
+function describeBrokenReason(reason: string | null | undefined, locale: "pt" | "en"): string | null {
+  if (!reason) return null;
+  const pt = locale === "pt";
+
+  if (reason.startsWith("site fora do ar")) {
+    const definitive = /ENOTFOUND|ECONNREFUSED|status code (404|410|5\d\d)/.test(reason);
+    if (!definitive) return null;
+    return pt ? "o site nem está no ar" : "the site isn't loading";
+  }
+  if (reason === "certificado de segurança com problema") {
+    return pt
+      ? "o navegador mostra um aviso de segurança ao abrir o site (certificado com problema)"
+      : "browsers show a security warning when opening the site (certificate problem)";
+  }
+  if (reason === "hospedagem suspensa") {
+    return pt ? "o site nem está no ar - parece hospedagem suspensa" : "the site isn't loading - the hosting looks suspended";
+  }
+  if (reason === "hospedagem vencida") {
+    return pt ? "o site nem está no ar - parece hospedagem vencida" : "the site isn't loading - the hosting looks expired";
+  }
+  if (reason.startsWith("domínio expirado")) {
+    return pt ? "o site nem está no ar - parece domínio expirado" : "the site isn't loading - the domain looks expired";
+  }
+  if (reason.startsWith("domínio estacionado") || reason.startsWith("domínio à venda") || reason.startsWith("redireciona pra domínio estacionado")) {
+    return pt ? "o domínio do site está estacionado/à venda" : "the site's domain looks parked or for sale";
+  }
+  if (reason.startsWith("página padrão")) {
+    return pt ? "o site nem está no ar - só aparece uma página padrão do servidor" : "the site isn't set up - only a default server page shows";
+  }
+  return null;
+}
+
 // Converte os achados reais da análise do site (site_analysis) numa frase
 // natural em português, pra email deixar de soar genérico ("coisas como
 // velocidade, visual...") e citar algo específico e verdadeiro sobre o
@@ -183,9 +220,8 @@ export function buildProblemSummary(analysis: SiteAnalysisSummary | null): strin
   // errado) é o achado mais forte possível - sobrepõe qualquer outro ponto,
   // porque nesse caso nem faz sentido falar de performance/visual.
   if (analysis.is_broken) {
-    return analysis.broken_reason
-      ? `o site nem está no ar - parece ${analysis.broken_reason}`
-      : "o site nem está no ar";
+    const claim = describeBrokenReason(analysis.broken_reason, "pt");
+    if (claim) return claim;
   }
 
   // Limiar bem mais permissivo que is_slow (>3s): qualquer nota abaixo de
@@ -225,9 +261,8 @@ export function buildProblemSummaryEN(analysis: SiteAnalysisSummary | null): str
   if (!analysis) return "there are a few things that could be improved";
 
   if (analysis.is_broken) {
-    return analysis.broken_reason
-      ? `the site isn't even online - looks like ${analysis.broken_reason}`
-      : "the site isn't even online";
+    const claim = describeBrokenReason(analysis.broken_reason, "en");
+    if (claim) return claim;
   }
 
   const parts: string[] = [];

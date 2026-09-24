@@ -119,6 +119,20 @@ export async function analyzeSite(website?: string): Promise<SiteAnalysisResult>
       headers: { "User-Agent": "Mozilla/5.0 (compatible; GarimpoLeadsBot/1.0)" },
     });
     const durationMs = Date.now() - startedAt;
+    // Resposta que nao e texto (JSON, binario) nao tem o que analisar -
+    // tratar como HTML quebrava o .replace/.test e marcava "fora do ar".
+    if (typeof response.data !== "string") {
+      return {
+        has_website: true,
+        is_wordpress: null,
+        performance_score: scoreFromDuration(durationMs),
+        is_outdated: null,
+        is_slow: durationMs > 3000,
+        is_broken: null,
+        broken_reason: null,
+        notes: `Carregou em ${durationMs}ms`,
+      };
+    }
     const html = response.data;
     // responseUrl reflete a URL final apos redirects (ex: dominio expirado
     // redirecionando pro site do registrador vender ele de novo).
@@ -138,9 +152,39 @@ export async function analyzeSite(website?: string): Promise<SiteAnalysisResult>
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";
-    // Erro de rede (DNS nao resolve, conexao recusada, timeout, HTTP
-    // 4xx/5xx) e o sinal mais forte de "site fora do ar" - apontamento
-    // errado, hospedagem cancelada ou dominio nem existe mais.
+    const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+
+    // Falha que NAO prova que o site esta fora do ar: o site abre normal no
+    // navegador, so nao respondeu bem pro nosso robo. Nesses casos nao ha
+    // achado confiavel - fica tudo nulo em vez de acusar "fora do ar".
+    const unknown: SiteAnalysisResult = {
+      has_website: true,
+      is_wordpress: null,
+      performance_score: null,
+      is_outdated: null,
+      is_slow: null,
+      is_broken: null,
+      broken_reason: null,
+      notes: `Falha ao acessar site: ${message}`,
+    };
+
+    // 401/403/429: WAF/Cloudflare barrando robo.
+    if (status === 401 || status === 403 || status === 429) {
+      return { ...unknown, notes: `Site bloqueou a analise automatica (HTTP ${status})` };
+    }
+    // Timeout: site lento, nao necessariamente fora do ar.
+    if (/timeout/i.test(message)) {
+      return { ...unknown, performance_score: 0, is_slow: true, notes: "Carregou em 8000ms (limite de espera)" };
+    }
+    // Conexao derrubada no meio: falha transitoria, nao da pra concluir nada.
+    if (/socket hang up|ECONNRESET/i.test(message)) return unknown;
+    // Certificado invalido/expirado: o navegador mostra aviso de seguranca
+    // (achado real e forte), mas o site nao esta "fora do ar".
+    if (/certificate|EPROTO|altnames|TLS|SSL/i.test(message)) {
+      return { ...unknown, is_broken: true, broken_reason: "certificado de segurança com problema" };
+    }
+
+    // DNS que nao resolve, conexao recusada, 404/5xx: fora do ar de verdade.
     return {
       has_website: true,
       is_wordpress: null,
