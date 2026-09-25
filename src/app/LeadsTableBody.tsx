@@ -243,11 +243,19 @@ function LeadDetails({ row }: { row: LeadRow }) {
           {lead.website && !lead.social_platform && (
             <Field label="Análise" icon={Flame}>
               <div className="flex flex-wrap gap-1.5">
-                {lead.performance_score !== null && <span className={chip}>nota {lead.performance_score}/100</span>}
+                {lead.ps_mobile_score !== null && (
+                  <span className={chip} title="PageSpeed Insights (Lighthouse do Google), no celular">
+                    Google celular {lead.ps_mobile_score}/100
+                    {lead.ps_lcp_ms !== null && ` · conteúdo em ${(lead.ps_lcp_ms / 1000).toFixed(1)}s`}
+                  </span>
+                )}
+                {lead.ps_mobile_score === null && lead.performance_score !== null && (
+                  <span className={chip}>nota {lead.performance_score}/100</span>
+                )}
                 {lead.is_wordpress && <span className={chip}>WordPress</span>}
                 {lead.is_outdated && <span className={chip}>visual antigo</span>}
                 {lead.is_slow && <span className={chip}>lento</span>}
-                {lead.performance_score === null && !lead.is_wordpress && !lead.is_outdated && !lead.is_slow && (
+                {lead.ps_mobile_score === null && lead.performance_score === null && !lead.is_wordpress && !lead.is_outdated && !lead.is_slow && (
                   <span className="text-zinc-400">sem achados</span>
                 )}
               </div>

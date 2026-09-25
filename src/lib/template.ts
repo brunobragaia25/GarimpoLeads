@@ -169,6 +169,9 @@ export interface SiteAnalysisSummary {
   is_broken?: boolean | null;
   broken_reason?: string | null;
   notes?: string | null;
+  // PageSpeed Insights (Lighthouse no celular) - achado real de velocidade.
+  ps_mobile_score?: number | null;
+  ps_lcp_ms?: number | null;
 }
 
 function extractLoadSeconds(notes: string | null | undefined, locale: Locale): string | null {
@@ -189,6 +192,7 @@ const PROBLEM_PHRASES: Record<
     slow: (s: string) => string;
     lowScore: (score: number) => string;
     slowGeneric: string;
+    pageSpeed: (score: number, lcpSeconds: string) => string;
     outdated: string;
     wordpress: string;
     offline: string;
@@ -207,6 +211,7 @@ const PROBLEM_PHRASES: Record<
     slow: (s) => `o site demora ${s} segundos pra carregar`,
     lowScore: (n) => `o site tem nota de performance baixa (${n} de 100)`,
     slowGeneric: "o carregamento tá bem lento",
+    pageSpeed: (n, s) => `no celular, o Google dá nota ${n} de 100 pra velocidade do site e o conteúdo principal leva ${s} segundos pra aparecer`,
     outdated: "o visual parece desatualizado",
     wordpress: "é feito em WordPress, o que costuma pesar mais e abrir brechas de segurança",
     offline: "o site nem está no ar",
@@ -224,6 +229,7 @@ const PROBLEM_PHRASES: Record<
     slow: (s) => `o site demora ${s} segundos a carregar`,
     lowScore: (n) => `o site tem uma nota de desempenho baixa (${n} em 100)`,
     slowGeneric: "o site está a carregar muito devagar",
+    pageSpeed: (n, s) => `no telemóvel, o Google atribui ao site uma nota de ${n} em 100 em velocidade e o conteúdo principal demora ${s} segundos a aparecer`,
     outdated: "o design parece desatualizado",
     wordpress: "foi feito em WordPress, o que costuma torná-lo mais pesado e mais exposto a falhas de segurança",
     offline: "o site não está no ar",
@@ -241,6 +247,7 @@ const PROBLEM_PHRASES: Record<
     slow: (s) => `the site takes ${s} seconds to load`,
     lowScore: (n) => `the site has a low performance score (${n}/100)`,
     slowGeneric: "it loads pretty slowly",
+    pageSpeed: (n, s) => `on mobile, Google rates the site ${n}/100 for speed and the main content takes ${s} seconds to appear`,
     outdated: "the design looks outdated",
     wordpress: "it's built on WordPress, which tends to be heavier and more exposed to security issues",
     offline: "the site isn't loading",
@@ -292,10 +299,19 @@ export function buildProblemSummaryForLocale(analysis: SiteAnalysisSummary | nul
     if (claim) return claim;
   }
 
-  // Limiar bem mais permissivo que is_slow (>3s): qualquer nota abaixo de
-  // 90 ja vale citar o numero real, que convence mais que "ta lento".
   const parts: string[] = [];
-  if (analysis.is_slow || (analysis.performance_score !== null && analysis.performance_score < 90)) {
+  const hasPageSpeed = typeof analysis.ps_mobile_score === "number" && typeof analysis.ps_lcp_ms === "number";
+  if (hasPageSpeed) {
+    // Achado real do Google. So vira problema abaixo do que o proprio Google
+    // considera bom (nota 90, conteudo principal em 2,5s) - site rapido nao
+    // ganha frase de "problema de velocidade" so pra ter o que dizer.
+    if (analysis.ps_mobile_score! < 90 || analysis.ps_lcp_ms! > 2500) {
+      const lcp = (analysis.ps_lcp_ms! / 1000).toFixed(1);
+      parts.push(t.pageSpeed(analysis.ps_mobile_score!, locale === "en" ? lcp : lcp.replace(".", ",")));
+    }
+  } else if (analysis.is_slow || (analysis.performance_score !== null && analysis.performance_score < 90)) {
+    // Sem PageSpeed: nota aproximada pelo tempo de uma requisicao. Limiar
+    // permissivo: qualquer nota abaixo de 90 ja vale citar o numero.
     const seconds = extractLoadSeconds(analysis.notes, locale);
     if (seconds && analysis.performance_score !== null) parts.push(t.slowWithScore(seconds, analysis.performance_score));
     else if (seconds) parts.push(t.slow(seconds));

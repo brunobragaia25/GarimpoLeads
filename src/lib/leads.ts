@@ -42,6 +42,10 @@ export interface LeadWithDetails {
   social_platform: SocialPlatform | null;
   whatsapp_template_sent_at: string | null;
   whatsapp_followup_sent_at: string | null;
+  ps_mobile_score: number | null;
+  ps_lcp_ms: number | null;
+  replied_at: string | null;
+  reply_snippet: string | null;
 }
 
 // Lista vem da view lead_overview (supabase/lead_overview.sql): lead + ultima
@@ -53,6 +57,7 @@ const OVERVIEW_COLUMNS = [
   "has_website, is_wordpress, performance_score, is_outdated, is_slow, is_broken, broken_reason, site_notes",
   "email, email_confidence, outreach_status, contacted_at, follow_up_sent_at, opened_at, clicked_at",
   "whatsapp_template_sent_at, whatsapp_followup_sent_at, social_platform",
+  "ps_mobile_score, ps_lcp_ms, replied_at, reply_snippet",
 ].join(", ");
 
 // PostgREST corta qualquer resposta em 1000 linhas (config "Max Rows").

@@ -43,6 +43,28 @@ describe("frase do problema do site", () => {
   });
 });
 
+describe("achado do PageSpeed (Lighthouse do Google)", () => {
+  const ps = { ...okSite, ps_mobile_score: 34, ps_lcp_ms: 6234 };
+
+  it("substitui a nota aproximada e cita nota + tempo reais, por idioma", () => {
+    expect(buildProblemSummaryForLocale(ps, "en")).toBe("on mobile, Google rates the site 34/100 for speed and the main content takes 6.2 seconds to appear");
+    expect(buildProblemSummaryForLocale(ps, "pt-BR")).toContain("nota 34 de 100");
+    expect(buildProblemSummaryForLocale(ps, "pt-BR")).toContain("6,2 segundos");
+    expect(buildProblemSummaryForLocale(ps, "pt-PT")).toContain("no telemóvel");
+    expect(buildProblemSummaryForLocale(ps, "pt-PT")).toContain("6,2 segundos a aparecer");
+  });
+
+  it("site rapido no Google nao ganha frase de problema de velocidade", () => {
+    const fast = { ...okSite, performance_score: 40, is_slow: true, ps_mobile_score: 96, ps_lcp_ms: 1200 };
+    expect(buildProblemSummaryForLocale(fast, "en")).toBe("there are a few things that could be improved");
+  });
+
+  it("junta com WordPress", () => {
+    const wp = { ...ps, is_wordpress: true };
+    expect(buildProblemSummaryForLocale(wp, "en")).toContain(" and it's built on WordPress");
+  });
+});
+
 describe("cidade extraida do endereco", () => {
   it.each([
     ["Rua X, 100 - Centro, Curitiba - PR, 80010-000, Brasil", "Curitiba"],

@@ -5,6 +5,8 @@ import { analyzeSite } from "./site-analysis";
 import { findEmailForWebsite } from "./hunter";
 import { scrapeEmailFromWebsite } from "./email-scraper";
 import { fetchBlockedPhones } from "./blocklist";
+import { detectSocialPlatform } from "./social-link";
+import { fetchPageSpeed, PageSpeedQuotaError } from "./pagespeed";
 import type { Country } from "./types";
 
 // O PostgREST do Supabase trunca qualquer resposta em 1000 linhas (config
@@ -305,4 +307,82 @@ export async function findPendingEmails(hunterLimit = 2, scrapeLimit = 100, coun
     emails_found: rows.filter((r) => r.email).length,
     hunter_calls_used: hunterUsed,
   };
+}
+
+// Consulta o PageSpeed (Lighthouse no celular) dos sites ainda sem esse
+// achado. Prioridade: leads que estao na fila do envio automatico (o
+// e-mail deles usa esse achado), depois os mais novos. Cada consulta leva
+// 10-40s, entao roda poucas por execucao, em paralelo, respeitando o prazo.
+export async function runPageSpeedForPending(limit = 8, deadline = Infinity, concurrency = 3) {
+  const apiKey = process.env.PAGESPEED_API_KEY;
+  if (!apiKey) return { analyzed: 0, skipped: "PAGESPEED_API_KEY nao configurada" };
+
+  type Row = { id: string; lead_id: string; analyzed_at: string; leads: { website: string | null } | { website: string | null }[] | null };
+  const websiteOf = (r: Row) => (Array.isArray(r.leads) ? r.leads[0]?.website : r.leads?.website) ?? null;
+
+  const base = () =>
+    supabase
+      .from("site_analysis")
+      .select("id, lead_id, analyzed_at, leads!inner(website)")
+      .is("ps_analyzed_at", null)
+      .eq("has_website", true)
+      .not("leads.website", "is", null)
+      .or("is_broken.is.null,is_broken.eq.false");
+
+  // 1) quem vai ser enviado logo
+  const { data: pending } = await supabase
+    .from("outreach")
+    .select("lead_id")
+    .eq("status", "pending")
+    .not("email", "is", null)
+    .order("created_at", { ascending: true })
+    .limit(limit * 6);
+  const pendingIds = (pending ?? []).map((r) => r.lead_id);
+
+  const candidates = new Map<string, Row>(); // lead_id -> analise mais recente
+  const addRows = (rows: Row[] | null) => {
+    for (const r of (rows ?? []).sort((a, b) => b.analyzed_at.localeCompare(a.analyzed_at))) {
+      if (!candidates.has(r.lead_id) && !detectSocialPlatform(websiteOf(r))) candidates.set(r.lead_id, r);
+    }
+  };
+  if (pendingIds.length > 0) {
+    const { data } = await base().in("lead_id", pendingIds);
+    addRows(data as Row[] | null);
+  }
+  // 2) completa com os mais novos
+  if (candidates.size < limit) {
+    const { data } = await base().order("analyzed_at", { ascending: false }).limit(limit * 3);
+    addRows(data as Row[] | null);
+  }
+
+  const queue = [...candidates.values()].slice(0, limit);
+  let analyzed = 0;
+  let quotaError: string | null = null;
+
+  async function worker() {
+    while (queue.length > 0 && Date.now() < deadline - 60_000 && !quotaError) {
+      const row = queue.shift()!;
+      const url = websiteOf(row);
+      if (!url) continue;
+      try {
+        const result = await fetchPageSpeed(url, apiKey!, Math.min(55_000, Math.max(5_000, deadline - Date.now() - 5_000)));
+        // Grava mesmo sem resultado (site que o Google nao abre) - senao a
+        // mesma consulta se repetiria todo dia.
+        await supabase
+          .from("site_analysis")
+          .update({
+            ps_mobile_score: result?.mobileScore ?? null,
+            ps_lcp_ms: result?.lcpMs ?? null,
+            ps_analyzed_at: new Date().toISOString(),
+          })
+          .eq("id", row.id);
+        analyzed++;
+      } catch (err) {
+        if (err instanceof PageSpeedQuotaError) quotaError = err.message;
+        // timeout de uma consulta: tenta de novo na proxima execucao
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  return { analyzed, ...(quotaError ? { quota_error: quotaError } : {}) };
 }

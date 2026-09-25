@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { scrapeLeadsForQuery, analyzePendingSites, findPendingEmails } from "@/lib/pipeline";
+import { scrapeLeadsForQuery, analyzePendingSites, findPendingEmails, runPageSpeedForPending } from "@/lib/pipeline";
 import { sendPendingOutreach, sendFollowUps } from "@/lib/send-outreach";
 import { sendPendingWhatsappTemplates, sendPendingWhatsappFollowUps } from "@/lib/send-whatsapp-outreach";
 import { getPairsForDay, getProspectionConfig } from "@/config/prospection";
@@ -32,6 +32,8 @@ const PAIRS_PER_DAY = 10;
 const HUNTER_FALLBACK_PER_DAY = 2;
 const SCRAPE_LIMIT_PER_DAY = 150;
 const ANALYZE_LIMIT_PER_DAY = 150;
+// Consultas ao PageSpeed por execucao (cada uma leva 10-40s).
+const PAGESPEED_PER_RUN = 8;
 
 // Envio inicial de email pros leads com email encontrado - antes só rodava
 // manualmente pelo botao do dashboard, nunca fazia parte do cron.
@@ -146,6 +148,18 @@ export async function GET(req: NextRequest) {
       }
     } else {
       errors.push("find-emails: pulado por falta de tempo");
+    }
+
+    // Achado real de velocidade (PageSpeed) dos que vao ser enviados logo -
+    // antes do envio, pra a frase do e-mail ja usar o achado.
+    if (timeLeft() > 100_000) {
+      try {
+        const ps = await runPageSpeedForPending(PAGESPEED_PER_RUN, deadline);
+        if ("quota_error" in ps && ps.quota_error) errors.push(`pagespeed: ${ps.quota_error}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "erro desconhecido";
+        errors.push(`pagespeed: ${message}`);
+      }
     }
 
     // Envio (inicial e follow-up) dividido igualmente entre os paises - sem

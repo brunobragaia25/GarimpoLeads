@@ -237,6 +237,8 @@ export default async function Home({
       is_broken: lead.is_broken,
       broken_reason: lead.broken_reason,
       notes: lead.site_notes,
+      ps_mobile_score: lead.ps_mobile_score,
+      ps_lcp_ms: lead.ps_lcp_ms,
     });
     const needsWhatsapp = !lead.email;
     const templateForWhatsapp =
