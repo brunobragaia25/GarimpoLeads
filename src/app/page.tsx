@@ -21,7 +21,7 @@ import { PageHeader } from "./PageHeader";
 import { FilterForm } from "./FilterForm";
 import { buildProblemSummary, getTemplate, getWhatsappNoSiteTemplate, renderTemplate } from "@/lib/template";
 import { hasUsablePhone, isMobilePhone, whatsappLink } from "@/lib/phone";
-import type { Country } from "@/lib/types";
+import { getSelectedCountry } from "@/lib/country-server";
 import {
   Users,
   Flame,
@@ -231,7 +231,7 @@ export default async function Home({
   searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
   const params = await searchParams;
-  const countryFilter: Country = params.country === "US" ? "US" : "BR";
+  const countryFilter = await getSelectedCountry();
   const category = params.category ?? "";
   const status = (params.status as EmailFilter) ?? "all";
   const search = (params.search ?? "").trim().toLowerCase();
@@ -272,8 +272,6 @@ export default async function Home({
     getWhatsappNoSiteTemplate(countryFilter),
   ]);
 
-  const brCount = statsByCountry.BR.total;
-  const usCount = statsByCountry.US.total;
   const stats = statsByCountry[countryFilter];
   const prospects = stats.prospects;
   const withEmail = stats.with_email;
@@ -308,7 +306,6 @@ export default async function Home({
   );
 
   const baseParams = {
-    country: countryFilter !== "BR" ? countryFilter : undefined,
     category,
     status,
     search,
@@ -327,28 +324,7 @@ export default async function Home({
       <PageHeader active="/" />
 
       <main className="px-6 py-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950">
-            {(
-              [
-                { value: "BR", label: `🇧🇷 Brasil (${brCount})` },
-                { value: "US", label: `🇺🇸 EUA (${usCount})` },
-              ] as const
-            ).map((option) => (
-              <a
-                key={option.value}
-                href={option.value === "BR" ? "/" : "/?country=US"}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  countryFilter === option.value
-                    ? "bg-emerald-600 text-white"
-                    : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
-                }`}
-              >
-                {option.label}
-              </a>
-            ))}
-          </div>
-
+        <div className="mb-4 flex items-center justify-end">
           <a
             href={`/api/export${buildQuery(baseParams)}`}
             className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50"

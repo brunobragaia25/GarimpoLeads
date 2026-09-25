@@ -10,6 +10,7 @@ import {
   Bot,
   type LucideIcon,
 } from "lucide-react";
+import { CountrySwitcher } from "./CountrySwitcher";
 
 const NAV_ITEMS: { href: string; icon: LucideIcon; label: string }[] = [
   { href: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -34,6 +35,8 @@ export function PageHeader({ active }: { active: string }) {
             GarimpoLeads
           </h1>
         </a>
+        <div className="flex flex-wrap items-center gap-3">
+        <CountrySwitcher />
         <nav className="flex flex-wrap items-center gap-1">
           {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
             const isActive = href === active;
@@ -53,6 +56,7 @@ export function PageHeader({ active }: { active: string }) {
             );
           })}
         </nav>
+        </div>
       </div>
     </header>
   );

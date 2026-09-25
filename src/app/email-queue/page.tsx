@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { countLeads, getLeadCategories, getLeadStats, queryLeads, type LeadQuery } from "@/lib/leads";
+import { countLeads, getLeadCategories, queryLeads, type LeadQuery } from "@/lib/leads";
 import {
   buildProblemSummary,
   buildProblemSummaryEN,
@@ -10,16 +10,15 @@ import {
 import { PageHeader } from "../PageHeader";
 import { EmailQueueClient, type EmailQueueLead } from "./EmailQueueClient";
 import { Mail } from "lucide-react";
-import type { Country } from "@/lib/types";
+import { getSelectedCountry } from "@/lib/country-server";
 
 export const dynamic = "force-dynamic";
 
 const QUEUE_BATCH_SIZE = 50;
 
-function buildQueueHref({ category, country }: { category?: string; country?: string }): string {
+function buildQueueHref({ category }: { category?: string }): string {
   const searchParams = new URLSearchParams();
   if (category) searchParams.set("category", category);
-  if (country) searchParams.set("country", country);
   const query = searchParams.toString();
   return query ? `/email-queue?${query}` : "/email-queue";
 }
@@ -31,9 +30,7 @@ export default async function EmailQueuePage({
 }) {
   const params = await searchParams;
   const categoryFilter = params.category ?? "all";
-  // Padrão EUA: hoje é o caso de uso principal dessa fila (no Brasil o
-  // canal manual é WhatsApp - ver /whatsapp-queue).
-  const countryFilter: Country = params.country === "BR" ? "BR" : "US";
+  const countryFilter = await getSelectedCountry();
 
   // Filtro e contagem no banco; so um lote vem pro app (recarregar traz o
   // proximo - quem ja foi marcado sai da lista).
@@ -43,15 +40,12 @@ export default async function EmailQueuePage({
     status: "not_contacted",
     hasEmail: true,
   };
-  const [statsByCountry, categories, totalPending, pending] = await Promise.all([
-    getLeadStats(),
+  const [categories, totalPending, pending] = await Promise.all([
     getLeadCategories(countryFilter),
     countLeads(queueQuery),
     queryLeads(queueQuery, 0, QUEUE_BATCH_SIZE),
   ]);
 
-  const brCount = statsByCountry.BR.email_queue_pending;
-  const usCount = statsByCountry.US.email_queue_pending;
 
   const noSiteTemplate = await getWhatsappNoSiteTemplate(countryFilter);
   const categoriesNeedingTemplate = [...new Set(pending.map((l) => l.category))];
@@ -111,30 +105,9 @@ export default async function EmailQueuePage({
           </div>
         </div>
 
-        <div className="mt-4 inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950">
-          {(
-            [
-              { value: "BR", label: `🇧🇷 Brasil (${brCount})` },
-              { value: "US", label: `🇺🇸 EUA (${usCount})` },
-            ] as const
-          ).map((option) => (
-            <Link
-              key={option.value}
-              href={buildQueueHref({ country: option.value })}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                countryFilter === option.value
-                  ? "bg-emerald-600 text-white"
-                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
-              }`}
-            >
-              {option.label}
-            </Link>
-          ))}
-        </div>
-
         {categories.length > 0 && (
           <div className="mt-4">
-            <CategoryFilter categories={categories} value={categoryFilter} countryFilter={countryFilter} />
+            <CategoryFilter categories={categories} value={categoryFilter} />
           </div>
         )}
 
@@ -147,16 +120,14 @@ export default async function EmailQueuePage({
 function CategoryFilter({
   categories,
   value,
-  countryFilter,
 }: {
   categories: string[];
   value: string;
-  countryFilter: string;
 }) {
   return (
     <div className="flex flex-wrap gap-2">
       <Link
-        href={buildQueueHref({ country: countryFilter === "US" ? undefined : countryFilter })}
+        href={buildQueueHref({})}
         className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
           value === "all"
             ? "border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
@@ -168,7 +139,7 @@ function CategoryFilter({
       {categories.map((c) => (
         <Link
           key={c}
-          href={buildQueueHref({ category: c, country: countryFilter === "US" ? undefined : countryFilter })}
+          href={buildQueueHref({ category: c })}
           className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
             value === c
               ? "border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"

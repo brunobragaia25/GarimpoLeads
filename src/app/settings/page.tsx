@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "../PageHeader";
+import { useSelectedCountry } from "../CountrySwitcher";
 import { SlidersHorizontal, Tag, MapPin, X, Save, Check, Plus } from "lucide-react";
 
 function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
@@ -18,10 +19,8 @@ function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
   );
 }
 
-type Country = "BR" | "US";
-
 export default function SettingsPage() {
-  const [country, setCountry] = useState<Country>("BR");
+  const country = useSelectedCountry();
   const [categories, setCategories] = useState<string[]>([]);
   const [cities, setCities] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState("");
@@ -31,6 +30,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    if (!country) return;
     fetch(`/api/config?country=${country}`)
       .then((res) => res.json())
       .then((data) => {
@@ -39,12 +39,6 @@ export default function SettingsPage() {
         setLoading(false);
       });
   }, [country]);
-
-  function handleSelectCountry(next: Country) {
-    setLoading(true);
-    setSaved(false);
-    setCountry(next);
-  }
 
   async function handleSave() {
     setSaving(true);
@@ -91,27 +85,6 @@ export default function SettingsPage() {
               Categorias e cidades usadas na rotação diária de prospecção
             </p>
           </div>
-        </div>
-
-        <div className="mb-4 mt-4 inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950">
-          {(
-            [
-              { value: "BR", label: "🇧🇷 Brasil" },
-              { value: "US", label: "🇺🇸 EUA" },
-            ] as const
-          ).map((option) => (
-            <button
-              key={option.value}
-              onClick={() => handleSelectCountry(option.value)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                country === option.value
-                  ? "bg-emerald-600 text-white"
-                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
         </div>
 
         {country === "US" && (

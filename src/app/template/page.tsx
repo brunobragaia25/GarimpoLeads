@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "../PageHeader";
+import { useSelectedCountry } from "../CountrySwitcher";
 import { MessageSquareText, Save, Check, Info } from "lucide-react";
 
 const FOLLOWUP_CATEGORY = "__followup__";
@@ -12,8 +13,10 @@ const NO_SITE_US_CATEGORY = "__no_site_us__";
 type Country = "BR" | "US";
 
 export default function TemplatePage() {
-  const [country, setCountry] = useState<Country>("BR");
-  const [category, setCategory] = useState<string>("");
+  const country = useSelectedCountry();
+  // null = ainda no "Padrão" do pais selecionado no topo.
+  const [categoryChoice, setCategoryChoice] = useState<string | null>(null);
+  const category = categoryChoice ?? (country === "US" ? DEFAULT_US_CATEGORY : "");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(true);
@@ -25,7 +28,8 @@ export default function TemplatePage() {
   });
 
   useEffect(() => {
-    loadTemplate(category);
+    if (!country) return;
+    loadTemplate(country === "US" ? DEFAULT_US_CATEGORY : "");
 
     Promise.all([
       fetch("/api/config?country=BR").then((res) => res.json()),
@@ -57,8 +61,7 @@ export default function TemplatePage() {
         US: [...new Set(usCategories)] as string[],
       });
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [country]);
 
   function loadTemplate(cat: string) {
     setLoading(true);
@@ -73,14 +76,9 @@ export default function TemplatePage() {
   }
 
   function handleCategoryChange(newCategory: string) {
-    setCategory(newCategory);
+    setCategoryChoice(newCategory);
     setSaved(false);
     loadTemplate(newCategory);
-  }
-
-  function handleCountryChange(newCountry: Country) {
-    setCountry(newCountry);
-    handleCategoryChange(newCountry === "US" ? DEFAULT_US_CATEGORY : "");
   }
 
   async function handleSave() {
@@ -95,7 +93,7 @@ export default function TemplatePage() {
     setSaved(true);
   }
 
-  const allCategories = categoriesByCountry[country];
+  const allCategories = country ? categoriesByCountry[country] : [];
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-black">
@@ -125,27 +123,6 @@ export default function TemplatePage() {
             <code className="rounded bg-blue-100 px-1 py-0.5 dark:bg-blue-900">{"{{problema}}"}</code>{" "}
             <span className="text-blue-700 dark:text-blue-400">(achado real da análise do site, ex: &quot;o carregamento tá bem lento&quot;)</span>
           </span>
-        </div>
-
-        <div className="mt-4 inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950">
-          {(
-            [
-              { value: "BR", label: "🇧🇷 Brasil" },
-              { value: "US", label: "🇺🇸 EUA" },
-            ] as const
-          ).map((option) => (
-            <button
-              key={option.value}
-              onClick={() => handleCountryChange(option.value)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                country === option.value
-                  ? "bg-emerald-600 text-white"
-                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
         </div>
 
         <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">

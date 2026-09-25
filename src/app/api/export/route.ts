@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, isValidSessionCookie } from "@/lib/auth";
 import { queryAllLeads, type EmailFilter } from "@/lib/leads";
+import { COUNTRY_COOKIE, parseCountry } from "@/lib/country";
 
 function csvEscape(value: string): string {
   if (/[",\n]/.test(value)) {
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
   }
 
   const params = req.nextUrl.searchParams;
-  const countryFilter = params.get("country") === "US" ? ("US" as const) : ("BR" as const);
+  const countryFilter = parseCountry(req.cookies.get(COUNTRY_COOKIE)?.value);
   const category = params.get("category") ?? "";
   const status = (params.get("status") as EmailFilter) ?? "all";
   const search = (params.get("search") ?? "").trim().toLowerCase();
