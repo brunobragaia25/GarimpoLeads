@@ -25,7 +25,7 @@ export function CategorySelect({
     <select
       value={value}
       onChange={(e) => handleChange(e.target.value)}
-      className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
+      className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
     >
       <option value="all">Todas as categorias</option>
       {categories.map((category) => (

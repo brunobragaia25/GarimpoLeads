@@ -108,6 +108,7 @@ export default async function WhatsappQueuePage({
         address: lead.address,
         phone: lead.phone!,
         website: lead.website,
+        mapsUrl: lead.google_maps_url,
         waLink,
         message,
       };
@@ -118,52 +119,47 @@ export default async function WhatsappQueuePage({
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-black">
       <PageHeader active="/whatsapp-queue" />
 
-      <main className="mx-auto max-w-2xl px-6 py-8">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-400">
-            <MessageCircle className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-              Fila de WhatsApp
-            </h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Envie manualmente, um por um, sem precisar caçar cada lead no dashboard
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950">
-            {(
-              [
-                { value: "all", label: "Todos" },
-                { value: "without", label: "Sem site" },
-                { value: "with", label: "Com site" },
-              ] as const
-            ).map((option) => (
-              <Link
-                key={option.value}
-                href={buildQueueHref({
-                  site: option.value === "all" ? undefined : option.value,
-                  category: categoryFilter === "all" ? undefined : categoryFilter,
-                })}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  siteFilter === option.value
-                    ? "bg-emerald-600 text-white"
-                    : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
-                }`}
-              >
-                {option.label}
-              </Link>
-            ))}
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-400">
+              <MessageCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Fila de WhatsApp</h1>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Um lead por vez: abra o WhatsApp, envie e marque. Sem site aparecem primeiro.
+              </p>
+            </div>
           </div>
 
-          <CategorySelect
-            categories={categories}
-            value={categoryFilter}
-            siteFilter={siteFilter}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex h-10 items-center rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950">
+              {(
+                [
+                  { value: "all", label: "Todos" },
+                  { value: "without", label: "Sem site" },
+                  { value: "with", label: "Com site" },
+                ] as const
+              ).map((option) => (
+                <Link
+                  key={option.value}
+                  href={buildQueueHref({
+                    site: option.value === "all" ? undefined : option.value,
+                    category: categoryFilter === "all" ? undefined : categoryFilter,
+                  })}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    siteFilter === option.value
+                      ? "bg-emerald-600 text-white"
+                      : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
+                  }`}
+                >
+                  {option.label}
+                </Link>
+              ))}
+            </div>
+            <CategorySelect categories={categories} value={categoryFilter} siteFilter={siteFilter} />
+          </div>
         </div>
 
         <QueueClient leads={queue} total={totalPending} key={`${countryFilter}:${siteFilter}:${categoryFilter}`} />
