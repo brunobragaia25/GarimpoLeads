@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { supabase } from "./supabase";
 import type { SocialPlatform } from "./social-link";
 import type { Country } from "./types";
@@ -153,6 +154,9 @@ export async function queryLeads(q: LeadQuery, offset: number, limit: number): P
     offset,
     offset + limit - 1
   );
+  // Offset alem do fim (pagina que nao existe mais): PostgREST devolve erro
+  // em vez de lista vazia.
+  if (error?.code === "PGRST103") return [];
   if (error) throw new Error(error.message);
   return (data ?? []).map(toLead);
 }
@@ -188,7 +192,7 @@ const EMPTY_STATS: LeadStats = {
   email_queue_pending: 0,
 };
 
-export async function getLeadStats(): Promise<Record<Country, LeadStats>> {
+async function fetchLeadStats(): Promise<Record<Country, LeadStats>> {
   const { data, error } = await supabase.from("lead_stats").select("*");
   if (error) throw new Error(error.message);
   const result: Record<Country, LeadStats> = { BR: { ...EMPTY_STATS }, US: { ...EMPTY_STATS } };
@@ -198,7 +202,7 @@ export async function getLeadStats(): Promise<Record<Country, LeadStats>> {
   return result;
 }
 
-export async function getLeadCategories(country: Country): Promise<string[]> {
+async function fetchLeadCategories(country: Country): Promise<string[]> {
   const { data, error } = await supabase
     .from("lead_category_counts")
     .select("category")
@@ -253,3 +257,16 @@ export type EmailFilter =
   | "proposal_sent"
   | "closed_won"
   | "closed_lost";
+
+// Numeros dos cards e lista de categorias mudam devagar e sao os calculos
+// mais caros (varrem a base inteira) - em cache por 60s, pra trocar de
+// pagina/filtro nao recalcular tudo. Podem ficar ate 1 min desatualizados.
+const STATS_CACHE_SECONDS = 60;
+
+export const getLeadStats = unstable_cache(fetchLeadStats, ["lead-stats"], {
+  revalidate: STATS_CACHE_SECONDS,
+});
+
+export const getLeadCategories = unstable_cache(fetchLeadCategories, ["lead-categories"], {
+  revalidate: STATS_CACHE_SECONDS,
+});

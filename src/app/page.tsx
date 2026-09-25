@@ -262,10 +262,13 @@ export default async function Home({
     sortDir,
   };
 
-  const [statsByCountry, categories, filteredCount, whatsappTemplate] = await Promise.all([
+  // Contagem e pagina pedidas juntas; so se a pagina nao existir mais (ex:
+  // filtro reduziu os resultados) busca de novo a ultima.
+  const [statsByCountry, categories, filteredCount, requestedItems, whatsappTemplate] = await Promise.all([
     getLeadStats(),
     getLeadCategories(countryFilter),
     countLeads(leadQuery),
+    queryLeads(leadQuery, (page - 1) * PAGE_SIZE, PAGE_SIZE),
     getWhatsappNoSiteTemplate(countryFilter),
   ]);
 
@@ -284,7 +287,10 @@ export default async function Home({
 
   const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const pageItems = await queryLeads(leadQuery, (currentPage - 1) * PAGE_SIZE, PAGE_SIZE);
+  const pageItems =
+    currentPage === page
+      ? requestedItems
+      : await queryLeads(leadQuery, (currentPage - 1) * PAGE_SIZE, PAGE_SIZE);
 
   // Leads sem email mas com site usam o mesmo template padrão do email
   // (por categoria) como texto do WhatsApp, em vez do template de "sem site".
