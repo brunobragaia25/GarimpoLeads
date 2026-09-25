@@ -161,6 +161,7 @@ function LeadDetails({ row }: { row: LeadRow }) {
   const events: { icon: LucideIcon; label: string; date: string | null; className: string }[] = [
     { icon: CheckCircle2, label: "E-mail enviado", date: lead.contacted_at, className: "text-emerald-600 dark:text-emerald-400" },
     { icon: RotateCw, label: "Follow-up", date: lead.follow_up_sent_at, className: "text-blue-600 dark:text-blue-400" },
+    { icon: MessageSquare, label: "Respondeu", date: lead.replied_at, className: "text-purple-600 dark:text-purple-400" },
     { icon: Eye, label: "Abriu", date: lead.opened_at, className: "text-amber-600 dark:text-amber-400" },
     { icon: MousePointerClick, label: "Clicou", date: lead.clicked_at, className: "text-pink-600 dark:text-pink-400" },
     { icon: MessageCircle, label: "WhatsApp enviado", date: lead.whatsapp_template_sent_at, className: "text-green-600 dark:text-green-400" },
@@ -292,6 +293,14 @@ function LeadDetails({ row }: { row: LeadRow }) {
               <span className="text-zinc-400">Nenhum contato feito ainda.</span>
             )}
           </Field>
+          {lead.reply_snippet && (
+            <div>
+              <p className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">O que respondeu</p>
+              <blockquote className="rounded-lg border-l-2 border-purple-500 bg-zinc-50 px-3 py-2 text-sm leading-relaxed text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                “{lead.reply_snippet}”
+              </blockquote>
+            </div>
+          )}
           {row.showPipeline && (
             <Field label="Etapa do funil" icon={FileText}>
               <PipelineStageSelect leadId={lead.id} currentStatus={row.pipelineStatus} />

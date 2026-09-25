@@ -6,6 +6,7 @@ import { sendPendingWhatsappTemplates, sendPendingWhatsappFollowUps } from "@/li
 import { getPairsForDay, getProspectionConfig } from "@/config/prospection";
 import { COUNTRIES, COUNTRY_CODES, type Country } from "@/lib/countries";
 import { notifyTelegram } from "@/lib/telegram";
+import { checkReplies } from "@/lib/reply-tracker";
 
 export const maxDuration = 300;
 
@@ -206,6 +207,13 @@ export async function GET(req: NextRequest) {
       }
     } else {
       errors.push("follow-ups: pulado por falta de tempo");
+    }
+
+    // Respostas na caixa de entrada -> marca o lead como "respondeu" (ou
+    // descadastra quem pediu pra parar). Sem IMAP configurado, so pula.
+    if (timeLeft() > 30_000) {
+      const replies = await checkReplies();
+      if (replies.error) errors.push(`replies: ${replies.error}`);
     }
 
     // Envio automatico de WhatsApp pausado a pedido do usuario (conta Meta
