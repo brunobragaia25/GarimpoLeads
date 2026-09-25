@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { countLeads, getLeadCategories, queryLeads, type LeadQuery } from "@/lib/leads";
 import {
   buildProblemSummaryFor,
@@ -10,23 +9,13 @@ import {
 import { whatsappLink } from "@/lib/phone";
 import { PageHeader } from "../PageHeader";
 import { QueueClient, type QueueLead } from "./QueueClient";
-import { CategorySelect } from "./CategorySelect";
+import { QueueFilters, type SiteFilter } from "../QueueFilters";
 import { MessageCircle } from "lucide-react";
 import { getSelectedCountry } from "@/lib/country-server";
 
 export const dynamic = "force-dynamic";
 
 const QUEUE_BATCH_SIZE = 50;
-
-type SiteFilter = "all" | "with" | "without";
-
-function buildQueueHref({ site, category }: { site?: string; category?: string }): string {
-  const searchParams = new URLSearchParams();
-  if (site) searchParams.set("site", site);
-  if (category) searchParams.set("category", category);
-  const query = searchParams.toString();
-  return query ? `/whatsapp-queue?${query}` : "/whatsapp-queue";
-}
 
 export default async function WhatsappQueuePage({
   searchParams,
@@ -133,33 +122,7 @@ export default async function WhatsappQueuePage({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex h-10 items-center rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950">
-              {(
-                [
-                  { value: "all", label: "Todos" },
-                  { value: "without", label: "Sem site" },
-                  { value: "with", label: "Com site" },
-                ] as const
-              ).map((option) => (
-                <Link
-                  key={option.value}
-                  href={buildQueueHref({
-                    site: option.value === "all" ? undefined : option.value,
-                    category: categoryFilter === "all" ? undefined : categoryFilter,
-                  })}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                    siteFilter === option.value
-                      ? "bg-emerald-600 text-white"
-                      : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
-                  }`}
-                >
-                  {option.label}
-                </Link>
-              ))}
-            </div>
-            <CategorySelect categories={categories} value={categoryFilter} siteFilter={siteFilter} />
-          </div>
+          <QueueFilters basePath="/whatsapp-queue" site={siteFilter} category={categoryFilter} categories={categories} />
         </div>
 
         <QueueClient leads={queue} total={totalPending} key={`${countryFilter}:${siteFilter}:${categoryFilter}`} />

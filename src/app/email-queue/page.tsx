@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { countLeads, getLeadCategories, queryLeads, type LeadQuery } from "@/lib/leads";
 import {
   buildProblemSummaryFor,
@@ -11,17 +10,11 @@ import { PageHeader } from "../PageHeader";
 import { EmailQueueClient, type EmailQueueLead } from "./EmailQueueClient";
 import { Mail } from "lucide-react";
 import { getSelectedCountry } from "@/lib/country-server";
+import { QueueFilters, type SiteFilter } from "../QueueFilters";
 
 export const dynamic = "force-dynamic";
 
 const QUEUE_BATCH_SIZE = 50;
-
-function buildQueueHref({ category }: { category?: string }): string {
-  const searchParams = new URLSearchParams();
-  if (category) searchParams.set("category", category);
-  const query = searchParams.toString();
-  return query ? `/email-queue?${query}` : "/email-queue";
-}
 
 export default async function EmailQueuePage({
   searchParams,
@@ -30,6 +23,7 @@ export default async function EmailQueuePage({
 }) {
   const params = await searchParams;
   const categoryFilter = params.category ?? "all";
+  const siteFilter: SiteFilter = params.site === "with" || params.site === "without" ? params.site : "all";
   const countryFilter = await getSelectedCountry();
 
   // Filtro e contagem no banco; so um lote vem pro app (recarregar traz o
@@ -38,7 +32,9 @@ export default async function EmailQueuePage({
     country: countryFilter,
     category: categoryFilter === "all" ? undefined : categoryFilter,
     status: "not_contacted",
+    site: siteFilter === "all" ? "" : siteFilter,
     hasEmail: true,
+    noSiteFirst: true,
   };
   const [categories, totalPending, pending] = await Promise.all([
     getLeadCategories(countryFilter),
@@ -81,6 +77,7 @@ export default async function EmailQueuePage({
       address: lead.address,
       email: lead.email!,
       website: lead.website,
+      mapsUrl: lead.google_maps_url,
       subject: rendered.subject,
       body: rendered.body,
     };
@@ -90,65 +87,24 @@ export default async function EmailQueuePage({
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-black">
       <PageHeader active="/email-queue" />
 
-      <main className="mx-auto max-w-2xl px-6 py-8">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-100 text-cyan-600 dark:bg-cyan-950 dark:text-cyan-400">
-            <Mail className="h-5 w-5" />
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-100 text-cyan-600 dark:bg-cyan-950 dark:text-cyan-400">
+              <Mail className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Fila de Email</h1>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Um lead por vez: abra no seu email (ou copie), envie e marque. Sem site aparecem primeiro.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-              Fila de Email
-            </h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Copie o email e mande manualmente, um por um
-            </p>
-          </div>
+          <QueueFilters basePath="/email-queue" site={siteFilter} category={categoryFilter} categories={categories} />
         </div>
 
-        {categories.length > 0 && (
-          <div className="mt-4">
-            <CategoryFilter categories={categories} value={categoryFilter} />
-          </div>
-        )}
-
-        <EmailQueueClient leads={queue} total={totalPending} key={`${countryFilter}:${categoryFilter}`} />
+        <EmailQueueClient leads={queue} total={totalPending} key={`${countryFilter}:${siteFilter}:${categoryFilter}`} />
       </main>
-    </div>
-  );
-}
-
-function CategoryFilter({
-  categories,
-  value,
-}: {
-  categories: string[];
-  value: string;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      <Link
-        href={buildQueueHref({})}
-        className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
-          value === "all"
-            ? "border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
-            : "border-zinc-200 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900"
-        }`}
-      >
-        Todas
-      </Link>
-      {categories.map((c) => (
-        <Link
-          key={c}
-          href={buildQueueHref({ category: c })}
-          className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
-            value === c
-              ? "border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
-              : "border-zinc-200 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900"
-          }`}
-        >
-          {c}
-        </Link>
-      ))}
     </div>
   );
 }
