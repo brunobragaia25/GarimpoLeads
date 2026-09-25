@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, isValidSessionCookie } from "@/lib/auth";
 import { getProspectionConfig, saveProspectionConfig } from "@/config/prospection";
-import type { Country } from "@/lib/types";
+import { parseCountry } from "@/lib/countries";
 
 async function isAuthorized(req: NextRequest): Promise<boolean> {
   const session = req.cookies.get(COOKIE_NAME)?.value;
   return isValidSessionCookie(session);
 }
 
-function parseCountry(value: string | null): Country {
-  return value === "US" ? "US" : "BR";
-}
 
 export async function GET(req: NextRequest) {
   if (!(await isAuthorized(req))) {

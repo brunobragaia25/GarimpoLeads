@@ -17,8 +17,9 @@ export function deduplicateLeads(leads: Lead[]): Lead[] {
 
 // Normaliza telefone pra comparação (só dígitos); retorna null se curto
 // demais pra ser um telefone real (evita falso-positivo em campos vazios).
+// 9 digitos e o menor telefone valido entre os paises (Portugal).
 export function normalizePhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
   const digits = phone.replace(/\D/g, "");
-  return digits.length >= 10 ? digits : null;
+  return digits.length >= 9 ? digits : null;
 }

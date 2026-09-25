@@ -1,5 +1,6 @@
 import axios from "axios";
-import { Lead, Country } from "./types";
+import { Lead } from "./types";
+import { COUNTRIES, type Country } from "./countries";
 
 const PLACES_BASE = "https://maps.googleapis.com/maps/api/place";
 
@@ -55,8 +56,8 @@ async function placeDetails(placeId: string, language: string): Promise<PlaceDet
 }
 
 export async function searchLeads(category: string, location: string, country: Country = "BR"): Promise<Lead[]> {
-  const language = country === "US" ? "en" : "pt-BR";
-  const query = country === "US" ? `${category} in ${location}` : `${category} em ${location}`;
+  const { placesLanguage: language, searchJoin } = COUNTRIES[country];
+  const query = `${category} ${searchJoin} ${location}`;
   const results = await textSearch(query, language);
 
   const leads: Lead[] = [];

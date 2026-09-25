@@ -1,26 +1,29 @@
 import { supabase } from "./supabase";
 import {
+  categoryTemplateKey,
   getTemplate,
   getFollowUpTemplate,
   renderTemplate,
-  buildProblemSummary,
-  buildProblemSummaryEN,
+  buildProblemSummaryFor,
   type MessageTemplate,
   type SiteAnalysisSummary,
 } from "./template";
 import { sendOutreachEmail } from "./resend";
 import { createUnsubscribeToken } from "./unsubscribe";
 import { startOfTodayBrasiliaISO } from "./timezone";
-import type { Country } from "./types";
+import { COUNTRIES, COUNTRY_CODES, parseCountry, type Country } from "./countries";
 
 function buildProblem(country: Country, analysis: SiteAnalysisSummary | null): string {
-  return country === "US" ? buildProblemSummaryEN(analysis) : buildProblemSummary(analysis);
+  return buildProblemSummaryFor(country, analysis);
 }
 
 function appendUnsubscribeFooter(body: string, link: string, country: Country): string {
-  return country === "US"
-    ? `${body}\n\n---\nIf you'd rather not get these emails, click here: ${link}`
-    : `${body}\n\n---\nSe não quiser mais receber esses emails, clique aqui: ${link}`;
+  const footer: Record<string, string> = {
+    en: "If you'd rather not get these emails, click here:",
+    "pt-PT": "Se não quiser receber mais estes emails, clique aqui:",
+    "pt-BR": "Se não quiser mais receber esses emails, clique aqui:",
+  };
+  return `${body}\n\n---\n${footer[COUNTRIES[country].locale]} ${link}`;
 }
 
 // Busca a análise mais recente de cada lead (pode ter mais de uma linha ao
@@ -47,7 +50,7 @@ async function buildTemplateResolver() {
   return async (category: string, country: Country): Promise<MessageTemplate> => {
     const key = `${country}:${category}`;
     if (!cache.has(key)) {
-      cache.set(key, await getTemplate(category, country));
+      cache.set(key, await getTemplate(categoryTemplateKey(category, country), country));
     }
     return cache.get(key)!;
   };
@@ -156,7 +159,7 @@ export async function sendPendingOutreach(
     const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads;
     if (!lead || !row.email) continue;
 
-    const country: Country = lead.country === "US" ? "US" : "BR";
+    const country = parseCountry(lead.country);
     const template = await resolveTemplate(lead.category, country);
     const rendered = renderTemplate(template, {
       name: lead.name,
@@ -229,10 +232,9 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = In
 
   if (error) throw new Error(error.message);
 
-  const followUpTemplateByCountry = {
-    BR: await getFollowUpTemplate("BR"),
-    US: await getFollowUpTemplate("US"),
-  };
+  const followUpTemplateByCountry = Object.fromEntries(
+    await Promise.all(COUNTRY_CODES.map(async (c) => [c, await getFollowUpTemplate(c)] as const))
+  ) as Record<Country, MessageTemplate>;
   const analysisByLead = await fetchLatestAnalysisByLead((rows ?? []).map((r) => r.lead_id));
   let sent = 0;
   let failed = 0;
@@ -243,7 +245,7 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = In
     const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads;
     if (!lead || !row.email) continue;
 
-    const country: Country = lead.country === "US" ? "US" : "BR";
+    const country = parseCountry(lead.country);
     const rendered = renderTemplate(followUpTemplateByCountry[country], {
       name: lead.name,
       category: lead.category,

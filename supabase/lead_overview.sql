@@ -38,7 +38,9 @@ select
   wc.followup_sent_at as whatsapp_followup_sent_at,
   sp.social_platform,
   (l.website is not null) as has_site,
-  (length(p.digits) >= 10) as has_usable_phone,
+  -- Portugal tem 9 digitos; os demais paises, 10+ (espelha minPhoneDigits
+  -- em src/lib/countries.ts).
+  (length(p.digits) >= case when l.country = 'PT' then 9 else 10 end) as has_usable_phone,
   (length(p.local) = 11 and substr(p.local, 3, 1) = '9') as is_mobile,
   (
     sa.has_website is false

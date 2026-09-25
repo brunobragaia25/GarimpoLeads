@@ -13,14 +13,15 @@ import { LeadsTableBody, type LeadRow } from "./LeadsTableBody";
 import { PageHeader } from "./PageHeader";
 import { FilterForm } from "./FilterForm";
 import {
-  buildProblemSummary,
-  buildProblemSummaryEN,
+  buildProblemSummaryFor,
+  categoryTemplateKey,
   getTemplate,
   getWhatsappNoSiteTemplate,
   renderTemplate,
 } from "@/lib/template";
-import { hasUsablePhone, isMobilePhone, whatsappLink } from "@/lib/phone";
+import { hasUsablePhone, mobileStatus, whatsappLink } from "@/lib/phone";
 import { getSelectedCountry } from "@/lib/country-server";
+import { COUNTRIES } from "@/lib/countries";
 import {
   Users,
   Flame,
@@ -222,13 +223,13 @@ export default async function Home({
   const defaultTemplateByCategory = new Map(
     await Promise.all(
       categoriesNeedingDefaultTemplate.map(
-        async (c) => [c, await getTemplate(c, countryFilter)] as const
+        async (c) => [c, await getTemplate(categoryTemplateKey(c, countryFilter), countryFilter)] as const
       )
     )
   );
 
   const rows: LeadRow[] = pageItems.map((lead) => {
-    const summary = (countryFilter === "US" ? buildProblemSummaryEN : buildProblemSummary)({
+    const summary = buildProblemSummaryFor(countryFilter, {
       performance_score: lead.performance_score,
       is_slow: lead.is_slow,
       is_outdated: lead.is_outdated,
@@ -249,13 +250,13 @@ export default async function Home({
             problem: summary,
           }).body
         : undefined;
-    const waLink = needsWhatsapp && hasUsablePhone(lead.phone) ? whatsappLink(lead.phone, lead.country, waText) : null;
+    const waLink = needsWhatsapp && hasUsablePhone(lead.phone, lead.country) ? whatsappLink(lead.phone, lead.country, waText) : null;
     const hasPipelineStatus = !!lead.outreach_status && PIPELINE_STATUSES.includes(lead.outreach_status);
     return {
       lead,
       score: computeLeadScore(lead),
       isPriority: isPriorityProspect(lead),
-      isLandline: !!lead.phone && !isMobilePhone(lead.phone),
+      isLandline: mobileStatus(lead.phone, lead.country) === false,
       waLink,
       // Lead sem email nao tem envio automatico (contato e na mao pelo
       // WhatsApp), entao libera o funil manual pra quem tem WhatsApp.
@@ -288,7 +289,7 @@ export default async function Home({
           <div>
             <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Dashboard</h1>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              {countryFilter === "US" ? "🇺🇸 Leads dos EUA" : "🇧🇷 Leads do Brasil"}
+              {COUNTRIES[countryFilter].flag} Leads — {COUNTRIES[countryFilter].name}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

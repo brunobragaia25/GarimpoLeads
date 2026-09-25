@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scrapeLeadsForQuery } from "@/lib/pipeline";
+import { parseCountry } from "@/lib/countries";
 
 function isAuthorized(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await scrapeLeadsForQuery(category, location, country === "US" ? "US" : "BR");
+    const result = await scrapeLeadsForQuery(category, location, parseCountry(country));
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";

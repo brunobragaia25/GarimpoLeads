@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { supabase } from "./supabase";
 import type { SocialPlatform } from "./social-link";
-import type { Country } from "./types";
+import { COUNTRY_CODES, isCountry, parseCountry, type Country } from "./countries";
 
 export function toBrasiliaDateStr(iso: string | null): string | null {
   if (!iso) return null;
@@ -136,7 +136,7 @@ function applyLeadQuery(query: any, q: LeadQuery) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toLead(row: any): LeadWithDetails {
-  return { ...row, country: (row.country ?? "BR") as Country } as LeadWithDetails;
+  return { ...row, country: parseCountry(row.country) } as LeadWithDetails;
 }
 
 export async function countLeads(q: LeadQuery): Promise<number> {
@@ -195,9 +195,10 @@ const EMPTY_STATS: LeadStats = {
 async function fetchLeadStats(): Promise<Record<Country, LeadStats>> {
   const { data, error } = await supabase.from("lead_stats").select("*");
   if (error) throw new Error(error.message);
-  const result: Record<Country, LeadStats> = { BR: { ...EMPTY_STATS }, US: { ...EMPTY_STATS } };
+  const result = Object.fromEntries(COUNTRY_CODES.map((c) => [c, { ...EMPTY_STATS }])) as Record<Country, LeadStats>;
   for (const row of data ?? []) {
-    if (row.country === "BR" || row.country === "US") result[row.country as Country] = row;
+    const country: unknown = row.country;
+    if (isCountry(country)) result[country] = row;
   }
   return result;
 }

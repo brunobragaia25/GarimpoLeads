@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { countLeads, getLeadCategories, queryLeads, type LeadQuery } from "@/lib/leads";
 import {
-  buildProblemSummary,
-  buildProblemSummaryEN,
+  buildProblemSummaryFor,
+  categoryTemplateKey,
   getTemplate,
   getWhatsappNoSiteTemplate,
   renderTemplate,
@@ -71,7 +71,7 @@ export default async function WhatsappQueuePage({
   const defaultTemplateByCategory = new Map(
     await Promise.all(
       categoriesNeedingDefaultTemplate.map(
-        async (c) => [c, await getTemplate(c, countryFilter)] as const
+        async (c) => [c, await getTemplate(categoryTemplateKey(c, countryFilter), countryFilter)] as const
       )
     )
   );
@@ -87,7 +87,7 @@ export default async function WhatsappQueuePage({
         name: lead.name,
         category: lead.category,
         address: lead.address,
-        problem: (countryFilter === "US" ? buildProblemSummaryEN : buildProblemSummary)({
+        problem: buildProblemSummaryFor(countryFilter, {
           performance_score: lead.performance_score,
           is_slow: lead.is_slow,
           is_outdated: lead.is_outdated,

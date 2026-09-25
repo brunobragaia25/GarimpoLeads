@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { countLeads, getLeadCategories, queryLeads, type LeadQuery } from "@/lib/leads";
 import {
-  buildProblemSummary,
-  buildProblemSummaryEN,
+  buildProblemSummaryFor,
+  categoryTemplateKey,
   getTemplate,
   getWhatsappNoSiteTemplate,
   renderTemplate,
@@ -50,7 +50,7 @@ export default async function EmailQueuePage({
   const noSiteTemplate = await getWhatsappNoSiteTemplate(countryFilter);
   const categoriesNeedingTemplate = [...new Set(pending.map((l) => l.category))];
   const templateByCategory = new Map(
-    await Promise.all(categoriesNeedingTemplate.map(async (c) => [c, await getTemplate(c, countryFilter)] as const))
+    await Promise.all(categoriesNeedingTemplate.map(async (c) => [c, await getTemplate(categoryTemplateKey(c, countryFilter), countryFilter)] as const))
   );
 
   const queue: EmailQueueLead[] = pending.map((lead) => {
@@ -58,7 +58,7 @@ export default async function EmailQueuePage({
     // novo, em vez do texto que comenta o site existente.
     const noSite = !lead.website || lead.social_platform !== null;
     const template = noSite ? noSiteTemplate : templateByCategory.get(lead.category)!;
-    const problem = (countryFilter === "US" ? buildProblemSummaryEN : buildProblemSummary)({
+    const problem = buildProblemSummaryFor(countryFilter, {
       performance_score: lead.performance_score,
       is_slow: lead.is_slow,
       is_outdated: lead.is_outdated,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, isValidSessionCookie } from "@/lib/auth";
 import { sendPendingOutreach } from "@/lib/send-outreach";
-import type { Country } from "@/lib/types";
+import { isCountry } from "@/lib/countries";
 
 export const maxDuration = 300;
 
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const limit = Math.min(body.limit ?? 100, 500);
-  const country: Country | undefined = body.country === "US" ? "US" : body.country === "BR" ? "BR" : undefined;
+  const country = isCountry(body.country) ? body.country : undefined;
 
   try {
     const result = await sendPendingOutreach(limit, body.leadId, undefined, country);

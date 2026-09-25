@@ -4,7 +4,7 @@ import { scrapeLeadsForQuery, analyzePendingSites, findPendingEmails } from "@/l
 import { sendPendingOutreach, sendFollowUps } from "@/lib/send-outreach";
 import { sendPendingWhatsappTemplates, sendPendingWhatsappFollowUps } from "@/lib/send-whatsapp-outreach";
 import { getPairsForDay, getProspectionConfig } from "@/config/prospection";
-import type { Country } from "@/lib/types";
+import { COUNTRY_CODES, type Country } from "@/lib/countries";
 
 export const maxDuration = 300;
 
@@ -19,10 +19,9 @@ const TIME_BUDGET_MS = 260_000;
 
 // Quantas combinações categoria+cidade rodar por dia, TOTAL somando todos
 // os países ativos (dividido entre eles - ver bloco de getProspectionConfig
-// mais abaixo). Era 5 (reduzido de 10 por causa do backlog de análise/email
-// pendente), mas agora que esse orçamento é repartido entre BR e EUA,
-// volta pra 10 pra cada país continuar com ~5/dia como antes. O loop já
-// para sozinho se o tempo apertar.
+// mais abaixo). Com varios paises ativos cada um recebe uma fatia (ex: 4
+// paises -> ~2 combinacoes/dia cada). O loop ja para sozinho se o tempo
+// apertar.
 const PAIRS_PER_DAY = 10;
 
 // Análise e busca de email agora rodam em paralelo (ver mapWithConcurrency
@@ -83,11 +82,10 @@ export async function GET(req: NextRequest) {
   try {
     try {
       // So entra na rotacao diaria o pais que tiver categoria E cidade
-      // configuradas - EUA fica de fora ate ser configurado de proposito
-      // (ver getProspectionConfig), pra nunca comecar a raspar la sem essa
-      // decisao explicita nem misturar com o BR sem querer.
+      // configuradas - pais novo fica de fora ate ser configurado de
+      // proposito (ver getProspectionConfig).
       const activeCountries: Country[] = [];
-      for (const country of ["BR", "US"] as const) {
+      for (const country of COUNTRY_CODES) {
         const config = await getProspectionConfig(country);
         if (config.categories.length > 0 && config.cities.length > 0) {
           activeCountries.push(country);
@@ -140,11 +138,11 @@ export async function GET(req: NextRequest) {
       errors.push("find-emails: pulado por falta de tempo");
     }
 
-    // Envio (inicial e follow-up) dividido igualmente entre BR e EUA - sem
+    // Envio (inicial e follow-up) dividido igualmente entre os paises - sem
     // isso, a ordem por mais antigo faz o backlog bem maior do BR consumir
     // a cota diaria inteira todo santo dia e o EUA nunca ser alcancado
     // (foi exatamente isso que aconteceu no primeiro dia com envio ligado).
-    const SEND_COUNTRIES: Country[] = ["BR", "US"];
+    const SEND_COUNTRIES: Country[] = COUNTRY_CODES;
     const emailLimitPerCountry = Math.ceil(EMAIL_SEND_LIMIT_PER_DAY / SEND_COUNTRIES.length);
     const followUpLimitPerCountry = Math.ceil(FOLLOWUP_LIMIT_PER_DAY / SEND_COUNTRIES.length);
 

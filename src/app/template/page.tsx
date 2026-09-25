@@ -4,62 +4,45 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "../PageHeader";
 import { useSelectedCountry } from "../CountrySwitcher";
 import { MessageSquareText, Save, Check, Info } from "lucide-react";
-
-const FOLLOWUP_CATEGORY = "__followup__";
-const WHATSAPP_NO_SITE_CATEGORY = "__whatsapp_no_site__";
-const DEFAULT_US_CATEGORY = "__default_us__";
-const NO_SITE_US_CATEGORY = "__no_site_us__";
-
-type Country = "BR" | "US";
+import { COUNTRIES, COUNTRY_CODES, categoryTemplateKey } from "@/lib/countries";
 
 export default function TemplatePage() {
   const country = useSelectedCountry();
+  const keys = country ? COUNTRIES[country].templateKeys : null;
+  const defaultKey = keys?.default ?? "";
   // null = ainda no "Padrão" do pais selecionado no topo.
   const [categoryChoice, setCategoryChoice] = useState<string | null>(null);
-  const category = categoryChoice ?? (country === "US" ? DEFAULT_US_CATEGORY : "");
+  const category = categoryChoice ?? defaultKey;
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [categoriesByCountry, setCategoriesByCountry] = useState<Record<Country, string[]>>({
-    BR: [],
-    US: [],
-  });
+  const [categories, setCategories] = useState<string[]>([]);
 
   useEffect(() => {
     if (!country) return;
-    loadTemplate(country === "US" ? DEFAULT_US_CATEGORY : "");
+    loadTemplate(COUNTRIES[country].templateKeys.default ?? "");
 
     Promise.all([
-      fetch("/api/config?country=BR").then((res) => res.json()),
-      fetch("/api/config?country=US").then((res) => res.json()),
+      ...COUNTRY_CODES.map((c) => fetch(`/api/config?country=${c}`).then((res) => res.json())),
       fetch("/api/template?list=1").then((res) => res.json()),
-    ]).then(([brConfig, usConfig, templateData]) => {
-      const brCategories: string[] = brConfig.categories ?? [];
-      const usCategories: string[] = usConfig.categories ?? [];
+    ]).then((results) => {
+      const templateData = results.pop();
+      const configCategories: string[][] = results.map((r) => r.categories ?? []);
+      const own = configCategories[COUNTRY_CODES.indexOf(country)];
 
       // Categoria com template proprio que nao esta em nenhuma config (ex:
-      // categoria removida da config depois de ja ter template) - cai no
-      // BR por padrao, ja que e o caso mais comum hoje.
-      const known = new Set([...brCategories, ...usCategories]);
-      const extra = (templateData.templates ?? [])
-        .map((t: { category: string | null }) => t.category)
-        .filter(
-          (c: string | null): c is string =>
-            !!c &&
-              !known.has(c) &&
-              c !== FOLLOWUP_CATEGORY &&
-              c !== WHATSAPP_NO_SITE_CATEGORY &&
-              c !== DEFAULT_US_CATEGORY &&
-              c !== NO_SITE_US_CATEGORY &&
-              !c.startsWith("__")
-        );
-
-      setCategoriesByCountry({
-        BR: [...new Set([...brCategories, ...extra])] as string[],
-        US: [...new Set(usCategories)] as string[],
-      });
+      // removida da config depois de ja ter template) - aparece no Brasil,
+      // ja que so BR/EUA usam o nome puro como chave.
+      let extra: string[] = [];
+      if (country === "BR") {
+        const known = new Set(configCategories.flat());
+        extra = (templateData.templates ?? [])
+          .map((t: { category: string | null }) => t.category)
+          .filter((c: string | null): c is string => !!c && !known.has(c) && !c.startsWith("__") && !c.includes(":"));
+      }
+      setCategories([...new Set([...own, ...extra])]);
     });
   }, [country]);
 
@@ -93,7 +76,6 @@ export default function TemplatePage() {
     setSaved(true);
   }
 
-  const allCategories = country ? categoriesByCountry[country] : [];
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-black">
@@ -134,34 +116,35 @@ export default function TemplatePage() {
             onChange={(e) => handleCategoryChange(e.target.value)}
             className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
           >
-            <option value={country === "US" ? DEFAULT_US_CATEGORY : ""}>Padrão (todas as categorias)</option>
-            {allCategories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-            {country === "BR" && (
+            <option value={defaultKey}>Padrão (todas as categorias)</option>
+            {country &&
+              categories.map((c) => (
+                <option key={c} value={categoryTemplateKey(c, country)}>
+                  {c}
+                </option>
+              ))}
+            {keys && (
               <>
-                <option value={FOLLOWUP_CATEGORY}>Follow-up (acompanhamento automático)</option>
-                <option value={WHATSAPP_NO_SITE_CATEGORY}>WhatsApp (leads sem site)</option>
+                <option value={keys.noSite}>Leads sem site (WhatsApp / fila de email)</option>
+                <option value={keys.followUp}>Follow-up (acompanhamento automático)</option>
               </>
             )}
           </select>
           <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-            {category === FOLLOWUP_CATEGORY
-              ? "Enviado automaticamente pra quem foi contatado há 5+ dias e não recebeu follow-up ainda. Se não configurar, usa um texto padrão simples."
-              : category === WHATSAPP_NO_SITE_CATEGORY
-                ? "Texto que já vem preenchido ao clicar no botão de WhatsApp de um lead sem site, no dashboard."
-                : category === DEFAULT_US_CATEGORY
-                  ? 'Texto padrão dos EUA: usado por toda categoria dos EUA que não tiver template próprio.'
-                  : 'Se uma categoria não tiver template próprio, usa o "Padrão" na hora de enviar.'}
+            {category === keys?.followUp
+              ? "Enviado automaticamente pra quem foi contatado há 5+ dias e não respondeu. Se não configurar, usa um texto padrão simples."
+              : category === keys?.noSite
+                ? "Mensagem pros leads sem site: vem preenchida na fila de WhatsApp e na fila de email."
+                : category === defaultKey
+                  ? "Usado por toda categoria deste país que não tiver template próprio."
+                  : 'Se uma categoria não tiver template próprio, usa o "Padrão" do país.'}
           </p>
 
           {loading ? (
             <p className="mt-6 text-sm text-zinc-500 dark:text-zinc-400">Carregando...</p>
           ) : (
             <>
-              {category !== WHATSAPP_NO_SITE_CATEGORY && (
+              {category !== "__whatsapp_no_site__" && (
                 <>
                   <label className="mt-5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                     Assunto
@@ -175,7 +158,7 @@ export default function TemplatePage() {
               )}
 
               <label className="mt-4 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                {category === WHATSAPP_NO_SITE_CATEGORY ? "Mensagem do WhatsApp" : "Corpo da mensagem"}
+                {category === "__whatsapp_no_site__" ? "Mensagem do WhatsApp" : "Corpo da mensagem"}
               </label>
               <textarea
                 value={body}

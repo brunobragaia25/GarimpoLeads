@@ -1,4 +1,5 @@
-export type Country = "BR" | "US";
+export type { Country } from "./countries";
+import type { Country } from "./countries";
 
 export interface Lead {
   id?: string;
