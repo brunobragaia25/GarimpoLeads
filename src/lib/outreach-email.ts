@@ -68,7 +68,9 @@ export function checkEmailQuality(text: string, country: Country, businessName: 
     blocking.push("inglês no meio de um e-mail em português");
   }
   if (locale === "pt-PT" && BR_ONLY_WORDS.test(plain)) warnings.push("palavra do português do Brasil num e-mail de Portugal");
-  if (/\b(in|em)\s*[,.]/.test(plain)) warnings.push("cidade ficou vazia na frase");
+  // Cidade vazia deixa "em ." (com espaco). Sem exigir o espaco, o
+  // "têm interesse em, pelo menos" do template de Portugal dava falso alarme.
+  if (/\b(in|em)\s+[,.]/.test(plain)) warnings.push("cidade ficou vazia na frase");
   return { blocking, warnings };
 }
 

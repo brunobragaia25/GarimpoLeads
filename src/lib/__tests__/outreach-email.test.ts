@@ -29,6 +29,12 @@ describe("checagem de qualidade do e-mail", () => {
     expect(checkEmailQuality("Olá, o site the loads and slow", "BR", "X").blocking).toHaveLength(1);
   });
 
+  it("'em,' no meio da frase nao e cidade vazia (falso alarme em Portugal)", () => {
+    expect(checkEmailQuality("têm interesse em, pelo menos, vê-la. Quem procura dentistas em Lisboa.", "PT", "X").warnings).toEqual([]);
+    expect(checkEmailQuality("quem procura dentistas em .", "PT", "X").warnings.join()).toMatch(/cidade/);
+    expect(checkEmailQuality("people searching for dentists in .", "US", "X").warnings.join()).toMatch(/cidade/);
+  });
+
   it("avisa cidade vazia e palavra do BR em e-mail de Portugal", () => {
     expect(checkEmailQuality("quem procura dentistas em .", "PT", "X").warnings.join()).toMatch(/cidade/);
     expect(checkEmailQuality("Você pode ver", "PT", "X").warnings.join()).toMatch(/Brasil/);
