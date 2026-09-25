@@ -7,6 +7,26 @@
 -- RLS das tabelas continua valendo (anon nao le nada; o app usa service
 -- role). Sem isso a view vazaria os dados pela API publica.
 
+-- ---------------------------------------------------------------------
+-- Colunas novas usadas pela view abaixo (todas idempotentes)
+-- ---------------------------------------------------------------------
+
+-- Registro do que cada disparo do cron realmente fez, por pais.
+alter table execution_logs add column if not exists emails_sent int not null default 0;
+alter table execution_logs add column if not exists follow_ups_sent int not null default 0;
+alter table execution_logs add column if not exists emails_failed int not null default 0;
+alter table execution_logs add column if not exists blocked_by_check int not null default 0;
+alter table execution_logs add column if not exists by_country jsonb;
+
+-- Achados reais do PageSpeed Insights (Lighthouse do Google, no celular).
+alter table site_analysis add column if not exists ps_mobile_score int;
+alter table site_analysis add column if not exists ps_lcp_ms int;
+alter table site_analysis add column if not exists ps_analyzed_at timestamptz;
+
+-- Resposta detectada na caixa de entrada.
+alter table outreach add column if not exists replied_at timestamptz;
+alter table outreach add column if not exists reply_snippet text;
+
 create or replace view lead_overview with (security_invoker = true) as
 select
   l.id,
@@ -61,17 +81,21 @@ select
          then greatest(0, 100 - sa.performance_score) * 0.2 else 0 end)
   )::int as score,
   (o.contacted_at at time zone 'America/Sao_Paulo')::date as contacted_date,
-  (o.follow_up_sent_at at time zone 'America/Sao_Paulo')::date as follow_up_date
+  (o.follow_up_sent_at at time zone 'America/Sao_Paulo')::date as follow_up_date,
+  sa.ps_mobile_score,
+  sa.ps_lcp_ms,
+  o.replied_at,
+  o.reply_snippet
 from leads l
 left join lateral (
   select has_website, is_wordpress, performance_score, is_outdated, is_slow,
-         is_broken, broken_reason, notes
+         is_broken, broken_reason, notes, ps_mobile_score, ps_lcp_ms
   from site_analysis where lead_id = l.id
   order by analyzed_at desc limit 1
 ) sa on true
 left join lateral (
   select email, email_confidence, status, contacted_at, follow_up_sent_at,
-         opened_at, clicked_at
+         opened_at, clicked_at, replied_at, reply_snippet
   from outreach where lead_id = l.id
   order by created_at desc limit 1
 ) o on true

@@ -4,7 +4,8 @@ import { scrapeLeadsForQuery, analyzePendingSites, findPendingEmails } from "@/l
 import { sendPendingOutreach, sendFollowUps } from "@/lib/send-outreach";
 import { sendPendingWhatsappTemplates, sendPendingWhatsappFollowUps } from "@/lib/send-whatsapp-outreach";
 import { getPairsForDay, getProspectionConfig } from "@/config/prospection";
-import { COUNTRY_CODES, type Country } from "@/lib/countries";
+import { COUNTRIES, COUNTRY_CODES, type Country } from "@/lib/countries";
+import { notifyTelegram } from "@/lib/telegram";
 
 export const maxDuration = 300;
 
@@ -69,6 +70,14 @@ export async function GET(req: NextRequest) {
   let followUpsSent = 0;
   let whatsappTemplatesSent = 0;
   let whatsappFollowUpsSent = 0;
+  let emailsFailed = 0;
+  let blockedByCheck = 0;
+  // Resumo por pais: o que o disparo realmente fez (antes so o total de
+  // leads/e-mails encontrados ia pro log, e nao dava pra saber se um pais
+  // ficou sem envio).
+  const byCountry = Object.fromEntries(
+    COUNTRY_CODES.map((c) => [c, { leads_found: 0, sent: 0, failed: 0, blocked: 0, follow_ups: 0 }])
+  ) as Record<Country, { leads_found: number; sent: number; failed: number; blocked: number; follow_ups: number }>;
   const pairs: { category: string; location: string; country: Country }[] = [];
 
   const timeLeft = () => TIME_BUDGET_MS - (Date.now() - startedAt);
@@ -109,6 +118,7 @@ export async function GET(req: NextRequest) {
       try {
         const result = await scrapeLeadsForQuery(category, location, country);
         leadsFound += result.new_leads;
+        byCountry[country].leads_found += result.new_leads;
       } catch (err) {
         const message = err instanceof Error ? err.message : "erro desconhecido";
         errors.push(`scrape ${category}/${location}: ${message}`);
@@ -151,6 +161,11 @@ export async function GET(req: NextRequest) {
         try {
           const outreachResult = await sendPendingOutreach(emailLimitPerCountry, undefined, deadline, country);
           emailsSent += outreachResult.sent;
+          emailsFailed += outreachResult.failed;
+          blockedByCheck += outreachResult.blocked;
+          byCountry[country].sent += outreachResult.sent;
+          byCountry[country].failed += outreachResult.failed;
+          byCountry[country].blocked += outreachResult.blocked;
         } catch (err) {
           const message = err instanceof Error ? err.message : "erro desconhecido";
           errors.push(`send-outreach-${country}: ${message}`);
@@ -165,6 +180,11 @@ export async function GET(req: NextRequest) {
         try {
           const followUpResult = await sendFollowUps(FOLLOWUP_DAYS_THRESHOLD, followUpLimitPerCountry, deadline, country);
           followUpsSent += followUpResult.sent;
+          emailsFailed += followUpResult.failed;
+          blockedByCheck += followUpResult.blocked;
+          byCountry[country].follow_ups += followUpResult.sent;
+          byCountry[country].failed += followUpResult.failed;
+          byCountry[country].blocked += followUpResult.blocked;
         } catch (err) {
           const message = err instanceof Error ? err.message : "erro desconhecido";
           errors.push(`follow-ups-${country}: ${message}`);
@@ -220,9 +240,31 @@ export async function GET(req: NextRequest) {
   await supabase.from("execution_logs").insert({
     leads_found: leadsFound,
     emails_found: emailsFound,
+    emails_sent: emailsSent,
+    follow_ups_sent: followUpsSent,
+    emails_failed: emailsFailed,
+    blocked_by_check: blockedByCheck,
+    by_country: byCountry,
     errors: errors.length > 0 ? errors.join(" | ") : null,
     duration_ms: durationMs,
   });
+
+  // Alerta no Telegram so quando algo deu errado (erro de etapa, falha de
+  // envio, e-mail barrado pela checagem de qualidade ou execucao perto do
+  // limite de tempo). "Desativado manualmente" e esperado, nao conta.
+  const realErrors = errors.filter((e) => !e.includes("desativado manualmente"));
+  if (realErrors.length > 0 || emailsFailed > 0 || blockedByCheck > 0 || durationMs > 240_000) {
+    const lines = [
+      "⚠️ GarimpoLeads: o disparo diário teve problemas",
+      `Enviados: ${emailsSent} | follow-ups: ${followUpsSent} | falhas: ${emailsFailed} | barrados pela checagem: ${blockedByCheck}`,
+      ...COUNTRY_CODES.filter((c) => byCountry[c].failed + byCountry[c].blocked > 0).map(
+        (c) => `${COUNTRIES[c].flag} ${COUNTRIES[c].name}: ${byCountry[c].failed} falhas, ${byCountry[c].blocked} barrados`
+      ),
+      ...realErrors.slice(0, 5).map((e) => `• ${e.slice(0, 160)}`),
+      durationMs > 240_000 ? `Duração: ${Math.round(durationMs / 1000)}s (limite 300s)` : "",
+    ].filter(Boolean);
+    await notifyTelegram(lines.join("\n"));
+  }
 
   return NextResponse.json({
     pairs_processed: pairs,
@@ -230,6 +272,9 @@ export async function GET(req: NextRequest) {
     emails_found: emailsFound,
     emails_sent: emailsSent,
     follow_ups_sent: followUpsSent,
+    emails_failed: emailsFailed,
+    blocked_by_check: blockedByCheck,
+    by_country: byCountry,
     whatsapp_templates_sent: whatsappTemplatesSent,
     whatsapp_followups_sent: whatsappFollowUpsSent,
     errors,

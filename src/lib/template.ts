@@ -143,7 +143,7 @@ export async function saveTemplate(
   }
 }
 
-function extractCity(address: string | null): string {
+export function extractCity(address: string | null): string {
   if (!address) return "";
   // Formato BR: "Rua X, Cidade - UF, CEP". Formato EUA (Google Places em
   // inglês): "Street, City, ST ZIP[, USA]" - sem traço antes da sigla do

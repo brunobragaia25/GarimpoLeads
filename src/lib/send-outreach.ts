@@ -3,28 +3,14 @@ import {
   categoryTemplateKey,
   getTemplate,
   getFollowUpTemplate,
-  renderTemplate,
-  buildProblemSummaryFor,
   type MessageTemplate,
   type SiteAnalysisSummary,
 } from "./template";
 import { sendOutreachEmail } from "./resend";
 import { createUnsubscribeToken } from "./unsubscribe";
 import { startOfTodayBrasiliaISO } from "./timezone";
-import { COUNTRIES, COUNTRY_CODES, parseCountry, type Country } from "./countries";
-
-function buildProblem(country: Country, analysis: SiteAnalysisSummary | null): string {
-  return buildProblemSummaryFor(country, analysis);
-}
-
-function appendUnsubscribeFooter(body: string, link: string, country: Country): string {
-  const footer: Record<string, string> = {
-    en: "If you'd rather not get these emails, click here:",
-    "pt-PT": "Se não quiser receber mais estes emails, clique aqui:",
-    "pt-BR": "Se não quiser mais receber esses emails, clique aqui:",
-  };
-  return `${body}\n\n---\n${footer[COUNTRIES[country].locale]} ${link}`;
-}
+import { COUNTRY_CODES, parseCountry, type Country } from "./countries";
+import { buildOutreachEmail } from "./outreach-email";
 
 // Busca a análise mais recente de cada lead (pode ter mais de uma linha ao
 // longo do tempo) e devolve um Map lead_id -> achados, pra montar o
@@ -35,7 +21,7 @@ async function fetchLatestAnalysisByLead(leadIds: string[]): Promise<Map<string,
 
   const { data: analyses } = await supabase
     .from("site_analysis")
-    .select("lead_id, performance_score, is_slow, is_outdated, is_wordpress, is_broken, broken_reason, notes, analyzed_at")
+    .select("lead_id, performance_score, is_slow, is_outdated, is_wordpress, is_broken, broken_reason, notes, ps_mobile_score, ps_lcp_ms, analyzed_at")
     .in("lead_id", leadIds)
     .order("analyzed_at", { ascending: false });
 
@@ -112,6 +98,7 @@ export async function sendPendingOutreach(
     return {
       sent: 0,
       failed: 0,
+      blocked: 0,
       total: 0,
       daily_limit_reached: true,
       sent_today: alreadySentToday,
@@ -141,7 +128,10 @@ export async function sendPendingOutreach(
     query = query.eq("leads.country", country);
   }
 
-  const { data: rows, error } = await query.limit(effectiveLimit);
+  // Janela maior que o limite: lead barrado pela checagem de qualidade
+  // fica pra tras sem ocupar a vaga dos que podem sair (senao o mesmo lote
+  // barrado travaria a fila inteira, como ja aconteceu com a busca de e-mail).
+  const { data: rows, error } = await query.limit(effectiveLimit * 3);
 
   if (error) throw new Error(error.message);
 
@@ -149,30 +139,41 @@ export async function sendPendingOutreach(
 
   let sent = 0;
   let failed = 0;
+  let blocked = 0;
 
   for (const row of rows ?? []) {
     // Checa a cada email, nao so antes de comecar - protege contra a soma
     // dos envios estourar o limite de execucao da funcao antes de terminar
     // o lote (o resto fica pro proximo cron).
     if (Date.now() > deadline) break;
+    if (sent + failed >= effectiveLimit) break;
 
     const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads;
     if (!lead || !row.email) continue;
 
     const country = parseCountry(lead.country);
     const template = await resolveTemplate(lead.category, country);
-    const rendered = renderTemplate(template, {
-      name: lead.name,
-      category: lead.category,
-      address: lead.address,
-      problem: buildProblem(country, analysisByLead.get(row.lead_id) ?? null),
-    });
     const token = await createUnsubscribeToken(row.lead_id);
     const link = unsubscribeLink(row.lead_id, token, country);
-    const bodyWithFooter = appendUnsubscribeFooter(rendered.body, link, country);
+    const email = buildOutreachEmail({
+      template,
+      country,
+      unsubscribeLink: link,
+      lead,
+      analysis: analysisByLead.get(row.lead_id) ?? null,
+    });
+
+    if (email.blocking.length > 0) {
+      blocked++;
+      await supabase
+        .from("outreach")
+        .update({ notes: `Bloqueado pela checagem: ${email.blocking.join("; ")}` })
+        .eq("id", row.id);
+      continue;
+    }
 
     try {
-      await sendOutreachEmail(row.email, rendered.subject, bodyWithFooter, link);
+      await sendOutreachEmail(row.email, email.subject, email.body, link);
       await supabase
         .from("outreach")
         .update({ status: "contacted", contacted_at: new Date().toISOString() })
@@ -191,6 +192,7 @@ export async function sendPendingOutreach(
   return {
     sent,
     failed,
+    blocked,
     total: (rows ?? []).length,
     daily_limit_reached: false,
     sent_today: alreadySentToday + sent,
@@ -207,7 +209,7 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = In
   const effectiveLimit = Math.min(limit, remainingToday);
 
   if (effectiveLimit === 0) {
-    return { sent: 0, failed: 0, total: 0 };
+    return { sent: 0, failed: 0, blocked: 0, total: 0 };
   }
 
   const cutoff = new Date();
@@ -222,7 +224,7 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = In
     .lte("contacted_at", cutoff.toISOString())
     .not("email", "is", null)
     .order("contacted_at", { ascending: true })
-    .limit(effectiveLimit);
+    .limit(effectiveLimit * 3);
 
   if (country) {
     query = query.eq("leads.country", country);
@@ -238,26 +240,37 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = In
   const analysisByLead = await fetchLatestAnalysisByLead((rows ?? []).map((r) => r.lead_id));
   let sent = 0;
   let failed = 0;
+  let blocked = 0;
 
   for (const row of rows ?? []) {
     if (Date.now() > deadline) break;
+    if (sent + failed >= effectiveLimit) break;
 
     const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads;
     if (!lead || !row.email) continue;
 
     const country = parseCountry(lead.country);
-    const rendered = renderTemplate(followUpTemplateByCountry[country], {
-      name: lead.name,
-      category: lead.category,
-      address: lead.address,
-      problem: buildProblem(country, analysisByLead.get(row.lead_id) ?? null),
-    });
     const token = await createUnsubscribeToken(row.lead_id);
     const link = unsubscribeLink(row.lead_id, token, country);
-    const bodyWithFooter = appendUnsubscribeFooter(rendered.body, link, country);
+    const email = buildOutreachEmail({
+      template: followUpTemplateByCountry[country],
+      country,
+      unsubscribeLink: link,
+      lead,
+      analysis: analysisByLead.get(row.lead_id) ?? null,
+    });
+
+    if (email.blocking.length > 0) {
+      blocked++;
+      await supabase
+        .from("outreach")
+        .update({ notes: `Follow-up bloqueado pela checagem: ${email.blocking.join("; ")}` })
+        .eq("id", row.id);
+      continue;
+    }
 
     try {
-      await sendOutreachEmail(row.email, rendered.subject, bodyWithFooter, link);
+      await sendOutreachEmail(row.email, email.subject, email.body, link);
       await supabase
         .from("outreach")
         .update({ follow_up_sent_at: new Date().toISOString() })
@@ -275,5 +288,68 @@ export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = In
     await sleep(600);
   }
 
-  return { sent, failed, total: (rows ?? []).length };
+  return { sent, failed, blocked, total: (rows ?? []).length };
+}
+
+export interface OutreachPreview {
+  outreachId: string;
+  leadId: string;
+  to: string;
+  leadName: string;
+  category: string;
+  country: Country;
+  website: string | null;
+  subject: string;
+  body: string;
+  blocking: string[];
+  warnings: string[];
+  previousNote: string | null;
+}
+
+// Mesma consulta e mesma montagem do envio real (sendPendingOutreach), mas
+// sem enviar nem gravar nada: mostra os proximos e-mails do pais, como
+// sairiam. `limit` e o tamanho da vitrine, nao a cota do dia.
+export async function previewPendingOutreach(country: Country, limit = 10): Promise<OutreachPreview[]> {
+  const resolveTemplate = await buildTemplateResolver();
+  const { data: rows, error } = await supabase
+    .from("outreach")
+    .select("id, lead_id, email, notes, leads!inner(name, category, address, country, website)")
+    .eq("status", "pending")
+    .not("email", "is", null)
+    .not("leads.website", "is", null)
+    .eq("leads.country", country)
+    .order("created_at", { ascending: true })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+
+  const analysisByLead = await fetchLatestAnalysisByLead((rows ?? []).map((r) => r.lead_id));
+  const previews: OutreachPreview[] = [];
+  for (const row of rows ?? []) {
+    const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads;
+    if (!lead || !row.email) continue;
+    const template = await resolveTemplate(lead.category, country);
+    const token = await createUnsubscribeToken(row.lead_id);
+    const email = buildOutreachEmail({
+      template,
+      country,
+      unsubscribeLink: unsubscribeLink(row.lead_id, token, country),
+      lead,
+      analysis: analysisByLead.get(row.lead_id) ?? null,
+    });
+    previews.push({
+      outreachId: row.id,
+      leadId: row.lead_id,
+      to: row.email,
+      leadName: lead.name,
+      category: lead.category,
+      country,
+      website: lead.website,
+      subject: email.subject,
+      body: email.body,
+      blocking: email.blocking,
+      warnings: email.warnings,
+      previousNote: row.notes,
+    });
+  }
+  return previews;
 }
