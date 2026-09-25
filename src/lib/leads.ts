@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { detectSocialPlatform, type SocialPlatform } from "./social-link";
+import type { SocialPlatform } from "./social-link";
 import type { Country } from "./types";
 
 export function toBrasiliaDateStr(iso: string | null): string | null {
@@ -43,92 +43,168 @@ export interface LeadWithDetails {
   whatsapp_followup_sent_at: string | null;
 }
 
-// Teto de segurança pra não puxar uma tabela ilimitada de uma vez; o cron
-// adiciona algumas centenas de leads por semana, então isso cobre meses.
-const MAX_LEADS = 5000;
-
-// O PostgREST do Supabase trunca silenciosamente qualquer resposta em 1000
-// linhas (configuração "Max Rows" do projeto), não importa o que o
-// `.limit()` do client peça - sem paginar explicitamente com `.range()`,
-// tudo que passa de 1000 leads simplesmente some da resposta sem erro
-// nenhum. Foi isso que fez o dashboard inteiro (total, prospects, com
-// email etc.) parecer travado assim que a tabela passou de 1000 linhas.
-const POSTGREST_PAGE_SIZE = 1000;
-
-// So as colunas que o app usa - "*" nos joins trazia ~60% a mais de dados.
-const LEAD_COLUMNS = [
+// Lista vem da view lead_overview (supabase/lead_overview.sql): lead + ultima
+// analise + outreach + WhatsApp + campos calculados (score, prioritario,
+// rede social). Filtro, ordenacao, paginacao e contagem rodam no banco -
+// antes o app baixava todos os leads a cada acesso e filtrava em memoria.
+const OVERVIEW_COLUMNS = [
   "id, name, category, phone, address, website, google_maps_url, country, created_at, crm_synced_at",
-  "site_analysis(has_website, is_wordpress, performance_score, is_outdated, is_slow, is_broken, broken_reason, notes)",
-  "outreach(email, email_confidence, status, contacted_at, follow_up_sent_at, opened_at, clicked_at)",
-  "whatsapp_conversations(template_sent_at, followup_sent_at)",
+  "has_website, is_wordpress, performance_score, is_outdated, is_slow, is_broken, broken_reason, site_notes",
+  "email, email_confidence, outreach_status, contacted_at, follow_up_sent_at, opened_at, clicked_at",
+  "whatsapp_template_sent_at, whatsapp_followup_sent_at, social_platform",
 ].join(", ");
 
-export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
-  const { count, error: countError } = await supabase
-    .from("leads")
-    .select("id", { count: "exact", head: true });
-  if (countError) throw new Error(countError.message);
+// PostgREST corta qualquer resposta em 1000 linhas (config "Max Rows").
+const POSTGREST_PAGE_SIZE = 1000;
 
-  // Paginas buscadas em paralelo (antes era uma por vez, ~700ms cada - era o
-  // grosso da demora pra abrir dashboard e filas). "id" desempata a ordem,
-  // senao leads com o mesmo created_at podiam repetir/sumir entre paginas.
-  const total = Math.min(count ?? 0, MAX_LEADS);
+export type LeadSortField = "created_at" | "score" | "name" | "category" | "performance" | "phone";
+
+export interface LeadQuery {
+  country: Country;
+  category?: string;
+  status?: EmailFilter;
+  search?: string;
+  priorityOnly?: boolean;
+  site?: "with" | "without" | "broken" | "";
+  sentDate?: string;
+  // Filtros usados pelas filas
+  hasEmail?: boolean;
+  usablePhoneOnly?: boolean;
+  excludeSocial?: boolean;
+  noSiteFirst?: boolean;
+  sortField?: LeadSortField;
+  sortDir?: "asc" | "desc";
+}
+
+const SORT_COLUMN: Record<LeadSortField, string> = {
+  created_at: "created_at",
+  score: "score",
+  name: "name",
+  category: "category",
+  performance: "performance_score",
+  phone: "is_mobile",
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyLeadQuery(query: any, q: LeadQuery) {
+  query = query.eq("country", q.country);
+  if (q.category) query = query.eq("category", q.category);
+
+  switch (q.status ?? "all") {
+    case "all":
+      break;
+    case "no_email":
+      query = query.is("email", null);
+      break;
+    case "not_contacted":
+      query = query.or("outreach_status.is.null,outreach_status.eq.pending");
+      break;
+    case "pending":
+      query = query.not("email", "is", null).eq("outreach_status", "pending");
+      break;
+    default:
+      query = query.eq("outreach_status", q.status);
+  }
+
+  if (q.search) {
+    // Escapa os curingas do ILIKE pra busca ser literal.
+    const term = q.search.replace(/[\\%_]/g, (c) => `\\${c}`);
+    query = query.ilike("name", `%${term}%`);
+  }
+  if (q.priorityOnly) query = query.eq("is_priority", true);
+  if (q.site === "with") query = query.not("website", "is", null);
+  if (q.site === "without") query = query.is("website", null);
+  if (q.site === "broken") query = query.eq("is_broken", true);
+  if (q.sentDate && /^\d{4}-\d{2}-\d{2}$/.test(q.sentDate)) {
+    query = query.or(`contacted_date.eq.${q.sentDate},follow_up_date.eq.${q.sentDate}`);
+  }
+  if (q.hasEmail === true) query = query.not("email", "is", null);
+  if (q.hasEmail === false) query = query.is("email", null);
+  if (q.usablePhoneOnly) query = query.eq("has_usable_phone", true);
+  if (q.excludeSocial) query = query.is("social_platform", null);
+
+  const ascending = q.sortDir === "asc";
+  if (q.noSiteFirst) query = query.order("has_site", { ascending: true });
+  const sortField = q.sortField ?? "created_at";
+  // Nota de performance nula conta como a menor possivel (mesmo que antes).
+  const nullsFirst = sortField === "performance" ? ascending : undefined;
+  query = query.order(SORT_COLUMN[sortField], { ascending, nullsFirst });
+  // Desempate estavel, senao a paginacao pode repetir/perder lead.
+  return query.order("id", { ascending: true });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toLead(row: any): LeadWithDetails {
+  return { ...row, country: (row.country ?? "BR") as Country } as LeadWithDetails;
+}
+
+export async function countLeads(q: LeadQuery): Promise<number> {
+  const { count, error } = await applyLeadQuery(
+    supabase.from("lead_overview").select("id", { count: "exact", head: true }),
+    { ...q, sortField: undefined, noSiteFirst: false }
+  );
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+export async function queryLeads(q: LeadQuery, offset: number, limit: number): Promise<LeadWithDetails[]> {
+  if (limit <= 0) return [];
+  const { data, error } = await applyLeadQuery(supabase.from("lead_overview").select(OVERVIEW_COLUMNS), q).range(
+    offset,
+    offset + limit - 1
+  );
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(toLead);
+}
+
+// Todos os leads que batem no filtro (export CSV) - paginas em paralelo.
+export async function queryAllLeads(q: LeadQuery): Promise<LeadWithDetails[]> {
+  const total = await countLeads(q);
   const offsets: number[] = [];
   for (let offset = 0; offset < total; offset += POSTGREST_PAGE_SIZE) offsets.push(offset);
+  const pages = await Promise.all(offsets.map((offset) => queryLeads(q, offset, POSTGREST_PAGE_SIZE)));
+  return pages.flat();
+}
 
-  const pages = await Promise.all(
-    offsets.map(async (offset) => {
-      const { data, error } = await supabase
-        .from("leads")
-        .select(LEAD_COLUMNS)
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: true })
-        .range(offset, Math.min(offset + POSTGREST_PAGE_SIZE, MAX_LEADS) - 1);
-      if (error) throw new Error(error.message);
-      return data ?? [];
-    })
-  );
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows: any[] = pages.flat();
+export interface LeadStats {
+  total: number;
+  prospects: number;
+  with_email: number;
+  pending_to_send: number;
+  not_contacted: number;
+  email_contacted: number;
+  whatsapp_contacted: number;
+  email_queue_pending: number;
+}
 
-  return rows.map((lead) => {
-    const analysis = Array.isArray(lead.site_analysis) ? lead.site_analysis[0] : null;
-    const outreach = Array.isArray(lead.outreach) ? lead.outreach[0] : null;
-    const whatsappConv = Array.isArray(lead.whatsapp_conversations)
-      ? lead.whatsapp_conversations[0]
-      : null;
+const EMPTY_STATS: LeadStats = {
+  total: 0,
+  prospects: 0,
+  with_email: 0,
+  pending_to_send: 0,
+  not_contacted: 0,
+  email_contacted: 0,
+  whatsapp_contacted: 0,
+  email_queue_pending: 0,
+};
 
-    return {
-      id: lead.id,
-      name: lead.name,
-      category: lead.category,
-      phone: lead.phone,
-      address: lead.address,
-      website: lead.website,
-      google_maps_url: lead.google_maps_url,
-      country: (lead.country ?? "BR") as Country,
-      created_at: lead.created_at,
-      has_website: analysis?.has_website ?? null,
-      is_wordpress: analysis?.is_wordpress ?? null,
-      performance_score: analysis?.performance_score ?? null,
-      is_outdated: analysis?.is_outdated ?? null,
-      is_slow: analysis?.is_slow ?? null,
-      is_broken: analysis?.is_broken ?? null,
-      broken_reason: analysis?.broken_reason ?? null,
-      site_notes: analysis?.notes ?? null,
-      email: outreach?.email ?? null,
-      email_confidence: outreach?.email_confidence ?? null,
-      outreach_status: outreach?.status ?? null,
-      contacted_at: outreach?.contacted_at ?? null,
-      follow_up_sent_at: outreach?.follow_up_sent_at ?? null,
-      opened_at: outreach?.opened_at ?? null,
-      clicked_at: outreach?.clicked_at ?? null,
-      crm_synced_at: lead.crm_synced_at ?? null,
-      social_platform: detectSocialPlatform(lead.website),
-      whatsapp_template_sent_at: whatsappConv?.template_sent_at ?? null,
-      whatsapp_followup_sent_at: whatsappConv?.followup_sent_at ?? null,
-    };
-  });
+export async function getLeadStats(): Promise<Record<Country, LeadStats>> {
+  const { data, error } = await supabase.from("lead_stats").select("*");
+  if (error) throw new Error(error.message);
+  const result: Record<Country, LeadStats> = { BR: { ...EMPTY_STATS }, US: { ...EMPTY_STATS } };
+  for (const row of data ?? []) {
+    if (row.country === "BR" || row.country === "US") result[row.country as Country] = row;
+  }
+  return result;
+}
+
+export async function getLeadCategories(country: Country): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("lead_category_counts")
+    .select("category")
+    .eq("country", country);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => r.category as string).sort((a, b) => a.localeCompare(b, "pt-BR"));
 }
 
 // Lead cujo "site" é na real só um link de Instagram/Facebook/WhatsApp/
@@ -177,11 +253,3 @@ export type EmailFilter =
   | "proposal_sent"
   | "closed_won"
   | "closed_lost";
-
-export function matchesEmailFilter(lead: LeadWithDetails, filter: EmailFilter): boolean {
-  if (filter === "all") return true;
-  if (filter === "no_email") return !lead.email;
-  if (filter === "not_contacted") return !lead.outreach_status || lead.outreach_status === "pending";
-  if (filter === "pending") return !!lead.email && lead.outreach_status === "pending";
-  return lead.outreach_status === filter;
-}

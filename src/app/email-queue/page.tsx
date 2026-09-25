@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getLeadsWithDetails } from "@/lib/leads";
+import { countLeads, getLeadCategories, getLeadStats, queryLeads, type LeadQuery } from "@/lib/leads";
 import {
   buildProblemSummary,
   buildProblemSummaryEN,
@@ -13,6 +13,8 @@ import { Mail } from "lucide-react";
 import type { Country } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+const QUEUE_BATCH_SIZE = 50;
 
 function buildQueueHref({ category, country }: { category?: string; country?: string }): string {
   const searchParams = new URLSearchParams();
@@ -33,27 +35,23 @@ export default async function EmailQueuePage({
   // canal manual é WhatsApp - ver /whatsapp-queue).
   const countryFilter: Country = params.country === "BR" ? "BR" : "US";
 
-  const allLeads = await getLeadsWithDetails();
+  // Filtro e contagem no banco; so um lote vem pro app (recarregar traz o
+  // proximo - quem ja foi marcado sai da lista).
+  const queueQuery: LeadQuery = {
+    country: countryFilter,
+    category: categoryFilter === "all" ? undefined : categoryFilter,
+    status: "not_contacted",
+    hasEmail: true,
+  };
+  const [statsByCountry, categories, totalPending, pending] = await Promise.all([
+    getLeadStats(),
+    getLeadCategories(countryFilter),
+    countLeads(queueQuery),
+    queryLeads(queueQuery, 0, QUEUE_BATCH_SIZE),
+  ]);
 
-  const brCount = allLeads.filter(
-    (l) => l.country === "BR" && l.email && (!l.outreach_status || l.outreach_status === "pending")
-  ).length;
-  const usCount = allLeads.filter(
-    (l) => l.country === "US" && l.email && (!l.outreach_status || l.outreach_status === "pending")
-  ).length;
-
-  const baseEligible = allLeads.filter(
-    (l) =>
-      !!l.email &&
-      (!l.outreach_status || l.outreach_status === "pending") &&
-      l.country === countryFilter
-  );
-
-  const categories = [...new Set(baseEligible.map((l) => l.category))].sort();
-
-  const pending = baseEligible.filter(
-    (l) => categoryFilter === "all" || l.category === categoryFilter
-  );
+  const brCount = statsByCountry.BR.email_queue_pending;
+  const usCount = statsByCountry.US.email_queue_pending;
 
   const noSiteTemplate = await getWhatsappNoSiteTemplate(countryFilter);
   const categoriesNeedingTemplate = [...new Set(pending.map((l) => l.category))];
@@ -140,7 +138,7 @@ export default async function EmailQueuePage({
           </div>
         )}
 
-        <EmailQueueClient leads={queue} key={`${countryFilter}:${categoryFilter}`} />
+        <EmailQueueClient leads={queue} total={totalPending} key={`${countryFilter}:${categoryFilter}`} />
       </main>
     </div>
   );

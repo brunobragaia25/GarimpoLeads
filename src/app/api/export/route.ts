@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, isValidSessionCookie } from "@/lib/auth";
-import {
-  getLeadsWithDetails,
-  isPriorityProspect,
-  matchesEmailFilter,
-  toBrasiliaDateStr,
-  type EmailFilter,
-} from "@/lib/leads";
+import { queryAllLeads, type EmailFilter } from "@/lib/leads";
 
 function csvEscape(value: string): string {
   if (/[",\n]/.test(value)) {
@@ -22,7 +16,7 @@ export async function GET(req: NextRequest) {
   }
 
   const params = req.nextUrl.searchParams;
-  const countryFilter = params.get("country") === "US" ? "US" : "BR";
+  const countryFilter = params.get("country") === "US" ? ("US" as const) : ("BR" as const);
   const category = params.get("category") ?? "";
   const status = (params.get("status") as EmailFilter) ?? "all";
   const search = (params.get("search") ?? "").trim().toLowerCase();
@@ -30,23 +24,14 @@ export async function GET(req: NextRequest) {
   const siteFilter = params.get("site") ?? "";
   const sentDate = params.get("sentDate") ?? "";
 
-  const allLeads = await getLeadsWithDetails();
-
-  const filtered = allLeads.filter((lead) => {
-    if (lead.country !== countryFilter) return false;
-    if (category && lead.category !== category) return false;
-    if (!matchesEmailFilter(lead, status)) return false;
-    if (search && !lead.name.toLowerCase().includes(search)) return false;
-    if (priorityOnly && !isPriorityProspect(lead)) return false;
-    if (siteFilter === "with" && !lead.website) return false;
-    if (siteFilter === "without" && lead.website) return false;
-    if (
-      sentDate &&
-      toBrasiliaDateStr(lead.contacted_at) !== sentDate &&
-      toBrasiliaDateStr(lead.follow_up_sent_at) !== sentDate
-    )
-      return false;
-    return true;
+  const filtered = await queryAllLeads({
+    country: countryFilter,
+    category: category || undefined,
+    status,
+    search: search || undefined,
+    priorityOnly,
+    site: siteFilter === "with" || siteFilter === "without" || siteFilter === "broken" ? siteFilter : "",
+    sentDate: sentDate || undefined,
   });
 
   const header = [

@@ -1,7 +1,13 @@
 import Link from "next/link";
-import { getLeadsWithDetails } from "@/lib/leads";
-import { buildProblemSummary, getTemplate, getWhatsappNoSiteTemplate, renderTemplate } from "@/lib/template";
-import { hasUsablePhone, whatsappLink } from "@/lib/phone";
+import { countLeads, getLeadCategories, getLeadStats, queryLeads, type LeadQuery } from "@/lib/leads";
+import {
+  buildProblemSummary,
+  buildProblemSummaryEN,
+  getTemplate,
+  getWhatsappNoSiteTemplate,
+  renderTemplate,
+} from "@/lib/template";
+import { whatsappLink } from "@/lib/phone";
 import { PageHeader } from "../PageHeader";
 import { QueueClient, type QueueLead } from "./QueueClient";
 import { CategorySelect } from "./CategorySelect";
@@ -42,42 +48,34 @@ export default async function WhatsappQueuePage({
   const categoryFilter = params.category ?? "all";
   const countryFilter: Country = params.country === "US" ? "US" : "BR";
 
-  const allLeads = await getLeadsWithDetails();
-  const whatsappTemplate = await getWhatsappNoSiteTemplate(countryFilter);
-
-  const brCount = allLeads.filter((l) => l.country === "BR").length;
-  const usCount = allLeads.filter((l) => l.country === "US").length;
-
   // Fica de fora da fila quem só tem link de rede social (Instagram,
   // LinkedIn, Facebook, Linktree) no campo "site" - não é um site de
-  // verdade, então não vale gastar tempo manual nesses; quem não tem site
-  // nenhum ou tem site de verdade continua entrando normalmente. País
-  // sempre filtrado - nunca mistura BR e EUA na mesma fila.
-  const baseEligible = allLeads.filter(
-    (l) =>
-      !l.email &&
-      hasUsablePhone(l.phone) &&
-      (!l.outreach_status || l.outreach_status === "pending") &&
-      l.social_platform === null &&
-      l.country === countryFilter
-  );
+  // verdade, então não vale gastar tempo manual nesses. País sempre
+  // filtrado - nunca mistura BR e EUA na mesma fila. Filtro, contagem e
+  // ordem (sem site primeiro) rodam no banco; só o lote vem pro app.
+  const queueQuery: LeadQuery = {
+    country: countryFilter,
+    category: categoryFilter === "all" ? undefined : categoryFilter,
+    status: "not_contacted",
+    site: siteFilter === "all" ? "" : siteFilter,
+    hasEmail: false,
+    usablePhoneOnly: true,
+    excludeSocial: true,
+    noSiteFirst: true,
+  };
 
-  // Lista de categorias calculada antes do filtro de categoria (mas depois
-  // do resto) pra continuar mostrando todas as opções disponíveis mesmo
-  // com uma categoria já selecionada.
-  const categories = [...new Set(baseEligible.map((l) => l.category))].sort((a, b) =>
-    a.localeCompare(b, "pt-BR")
-  );
+  // So um lote vai pro navegador (montar a mensagem de todos os elegiveis
+  // gerava ~4MB de HTML); recarregar a pagina traz o proximo.
+  const [statsByCountry, categories, totalPending, pending, whatsappTemplate] = await Promise.all([
+    getLeadStats(),
+    getLeadCategories(countryFilter),
+    countLeads(queueQuery),
+    queryLeads(queueQuery, 0, QUEUE_BATCH_SIZE),
+    getWhatsappNoSiteTemplate(countryFilter),
+  ]);
 
-  const pending = baseEligible.filter(
-    (l) =>
-      (siteFilter === "all" || (siteFilter === "with" ? !!l.website : !l.website)) &&
-      (categoryFilter === "all" || l.category === categoryFilter)
-  );
-
-  // Empresas sem site vem primeiro (foco atual da abordagem); a ordenacao
-  // do JS e estavel, entao dentro de cada grupo a ordem original continua.
-  pending.sort((a, b) => Number(!!a.website) - Number(!!b.website));
+  const brCount = statsByCountry.BR.total;
+  const usCount = statsByCountry.US.total;
 
   const categoriesNeedingDefaultTemplate = [
     ...new Set(pending.filter((l) => l.website).map((l) => l.category)),
@@ -90,12 +88,7 @@ export default async function WhatsappQueuePage({
     )
   );
 
-  // So um lote vai pro navegador: montar a mensagem de todos os elegiveis
-  // gerava ~4MB de HTML a cada acesso. Recarregar a pagina traz o proximo
-  // lote (quem ja foi marcado sai da lista).
-  const totalPending = pending.length;
   const queue: QueueLead[] = pending
-    .slice(0, QUEUE_BATCH_SIZE)
     .map((lead) => {
       const template = lead.website
         ? defaultTemplateByCategory.get(lead.category)
@@ -106,7 +99,7 @@ export default async function WhatsappQueuePage({
         name: lead.name,
         category: lead.category,
         address: lead.address,
-        problem: buildProblemSummary({
+        problem: (countryFilter === "US" ? buildProblemSummaryEN : buildProblemSummary)({
           performance_score: lead.performance_score,
           is_slow: lead.is_slow,
           is_outdated: lead.is_outdated,

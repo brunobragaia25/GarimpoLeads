@@ -1,10 +1,12 @@
 import {
-  getLeadsWithDetails,
+  countLeads,
+  getLeadCategories,
+  getLeadStats,
   isPriorityProspect,
-  matchesEmailFilter,
   computeLeadScore,
-  toBrasiliaDateStr,
+  queryLeads,
   type EmailFilter,
+  type LeadQuery,
 } from "@/lib/leads";
 import { SendOutreachButton } from "./SendOutreachButton";
 import {
@@ -246,89 +248,43 @@ export default async function Home({
   const sortDir: SortDir = params.sortDir === "asc" ? "asc" : "desc";
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
-  const allLeadsUnfiltered = await getLeadsWithDetails();
-  const whatsappTemplate = await getWhatsappNoSiteTemplate(countryFilter);
+  // Filtro, ordenacao, paginacao e contagem rodam no banco (view
+  // lead_overview) - o app so recebe os 25 leads da pagina.
+  const leadQuery: LeadQuery = {
+    country: countryFilter,
+    category: category || undefined,
+    status,
+    search: search || undefined,
+    priorityOnly,
+    site: siteFilter === "with" || siteFilter === "without" || siteFilter === "broken" ? siteFilter : "",
+    sentDate: sentDate || undefined,
+    sortField,
+    sortDir,
+  };
 
-  const brCount = allLeadsUnfiltered.filter((l) => l.country === "BR").length;
-  const usCount = allLeadsUnfiltered.filter((l) => l.country === "US").length;
+  const [statsByCountry, categories, filteredCount, whatsappTemplate] = await Promise.all([
+    getLeadStats(),
+    getLeadCategories(countryFilter),
+    countLeads(leadQuery),
+    getWhatsappNoSiteTemplate(countryFilter),
+  ]);
 
-  // Tudo abaixo (stats, categorias, filtro, paginação) roda só sobre o país
-  // selecionado - BR e EUA nunca aparecem misturados no mesmo dashboard,
-  // já que categorias e volumes são completamente diferentes entre os dois.
-  const allLeads = allLeadsUnfiltered.filter((l) => l.country === countryFilter);
-
-  const categories = [...new Set(allLeads.map((l) => l.category))].sort();
-
-  const dirMultiplier = sortDir === "asc" ? 1 : -1;
-
-  const filtered = allLeads
-    .filter((lead) => {
-      if (category && lead.category !== category) return false;
-      if (!matchesEmailFilter(lead, status)) return false;
-      if (search && !lead.name.toLowerCase().includes(search)) return false;
-      if (priorityOnly && !isPriorityProspect(lead)) return false;
-      if (siteFilter === "with" && !lead.website) return false;
-      if (siteFilter === "without" && lead.website) return false;
-      if (siteFilter === "broken" && !lead.is_broken) return false;
-      if (
-        sentDate &&
-        toBrasiliaDateStr(lead.contacted_at) !== sentDate &&
-        toBrasiliaDateStr(lead.follow_up_sent_at) !== sentDate
-      )
-        return false;
-      return true;
-    })
-    .sort((a, b) => {
-      switch (sortField) {
-        case "score":
-          return (computeLeadScore(a) - computeLeadScore(b)) * dirMultiplier;
-        case "name":
-          return a.name.localeCompare(b.name) * dirMultiplier;
-        case "category":
-          return a.category.localeCompare(b.category) * dirMultiplier;
-        case "performance": {
-          const aVal = a.performance_score ?? -1;
-          const bVal = b.performance_score ?? -1;
-          return (aVal - bVal) * dirMultiplier;
-        }
-        case "phone": {
-          const aVal = isMobilePhone(a.phone) ? 1 : 0;
-          const bVal = isMobilePhone(b.phone) ? 1 : 0;
-          return (aVal - bVal) * dirMultiplier;
-        }
-        default:
-          return (
-            (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) *
-            dirMultiplier
-          );
-      }
-    });
-
-  const prospects = allLeads.filter(isPriorityProspect).length;
-  const withEmail = allLeads.filter((l) => l.email).length;
-  const pendingToSend = allLeads.filter(
-    (l) => l.email && l.outreach_status === "pending"
-  ).length;
-  const notContacted = allLeads.filter(
-    (l) => !l.outreach_status || l.outreach_status === "pending"
-  ).length;
-  const emailContacted = allLeads.filter(
-    (l) => l.email && l.outreach_status === "contacted"
-  ).length;
+  const brCount = statsByCountry.BR.total;
+  const usCount = statsByCountry.US.total;
+  const stats = statsByCountry[countryFilter];
+  const prospects = stats.prospects;
+  const withEmail = stats.with_email;
+  const pendingToSend = stats.pending_to_send;
+  const notContacted = stats.not_contacted;
+  const emailContacted = stats.email_contacted;
   // Conta tanto a marcacao manual antiga (lead sem email marcado
-  // "contacted" na tabela de outreach - fluxo pre-automacao) quanto o
-  // envio automatico real via IA (whatsapp_conversations.template_sent_at),
-  // que fica numa tabela separada e nao aparecia aqui antes.
-  const whatsappContacted = allLeads.filter(
-    (l) => (!l.email && l.outreach_status === "contacted") || l.whatsapp_template_sent_at
-  ).length;
+  // "contacted" - fluxo pre-automacao) quanto o envio automatico real
+  // (whatsapp_conversations.template_sent_at) - ver view lead_stats.
+  const whatsappContacted = stats.whatsapp_contacted;
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const pageItems = filtered.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  );
+  const pageItems = await queryLeads(leadQuery, (currentPage - 1) * PAGE_SIZE, PAGE_SIZE);
 
   // Leads sem email mas com site usam o mesmo template padrão do email
   // (por categoria) como texto do WhatsApp, em vez do template de "sem site".
@@ -401,7 +357,7 @@ export default async function Home({
           <StatCard
             icon={Users}
             label="leads no total"
-            value={allLeads.length}
+            value={stats.total}
             accent="bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400"
           />
           <StatCard
@@ -456,7 +412,7 @@ export default async function Home({
         />
 
         <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
-          {filtered.length} resultado(s) &middot; página {currentPage} de {totalPages}
+          {filteredCount} resultado(s) &middot; página {currentPage} de {totalPages}
         </p>
 
         {/* Table */}
