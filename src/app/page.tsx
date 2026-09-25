@@ -9,17 +9,16 @@ import {
   type LeadQuery,
 } from "@/lib/leads";
 import { SendOutreachButton } from "./SendOutreachButton";
-import {
-  DeleteLeadButton,
-  EditableEmail,
-  EditablePhone,
-  IgnoreButton,
-  PipelineStageSelect,
-  SendToCRMButton,
-} from "./LeadActions";
+import { LeadsTableBody, type LeadRow } from "./LeadsTableBody";
 import { PageHeader } from "./PageHeader";
 import { FilterForm } from "./FilterForm";
-import { buildProblemSummary, getTemplate, getWhatsappNoSiteTemplate, renderTemplate } from "@/lib/template";
+import {
+  buildProblemSummary,
+  buildProblemSummaryEN,
+  getTemplate,
+  getWhatsappNoSiteTemplate,
+  renderTemplate,
+} from "@/lib/template";
 import { hasUsablePhone, isMobilePhone, whatsappLink } from "@/lib/phone";
 import { getSelectedCountry } from "@/lib/country-server";
 import {
@@ -27,25 +26,12 @@ import {
   Flame,
   MailCheck,
   Download,
-  Phone,
   MessageCircle,
-  Globe,
-  ExternalLink,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
   CheckCircle2,
-  MessageSquare,
-  Calendar,
-  FileText,
-  Trophy,
-  XCircle,
-  Ban,
-  AlertTriangle,
-  Eye,
-  MousePointerClick,
-  RotateCw,
   Clock,
   ArrowUp,
   ArrowDown,
@@ -66,74 +52,10 @@ const PIPELINE_STATUSES = [
   "closed_lost",
 ];
 
-const STATUS_BADGES: Record<string, { label: string; icon: LucideIcon; className: string }> = {
-  pending: {
-    label: "Pendente",
-    icon: Clock,
-    className: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
-  },
-  contacted: {
-    label: "Enviado",
-    icon: CheckCircle2,
-    className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
-  },
-  responded: {
-    label: "Respondeu",
-    icon: MessageSquare,
-    className: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400",
-  },
-  meeting_scheduled: {
-    label: "Reunião marcada",
-    icon: Calendar,
-    className: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400",
-  },
-  proposal_sent: {
-    label: "Proposta enviada",
-    icon: FileText,
-    className: "bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-400",
-  },
-  closed_won: {
-    label: "Fechado (ganho)",
-    icon: Trophy,
-    className: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400",
-  },
-  closed_lost: {
-    label: "Fechado (perdido)",
-    icon: XCircle,
-    className: "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
-  },
-  ignored: {
-    label: "Ignorado",
-    icon: Ban,
-    className: "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
-  },
-  unsubscribed: {
-    label: "Descadastrado",
-    icon: Ban,
-    className: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400",
-  },
-  bounced: {
-    label: "Email inválido",
-    icon: AlertTriangle,
-    className: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400",
-  },
-};
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 25;
-
-function formatDate(iso: string | null): string {
-  if (!iso) return "-";
-  return new Date(iso).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "America/Sao_Paulo",
-  });
-}
 
 function buildQuery(params: Record<string, string | undefined>): string {
   const search = new URLSearchParams();
@@ -203,21 +125,21 @@ function StatCard({
   accent: string;
 }) {
   const content = (
-    <div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-shadow hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${accent}`}>
-        <Icon className="h-5 w-5" />
+    <div className="flex h-full flex-col justify-between gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-shadow hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-medium leading-snug text-zinc-500 dark:text-zinc-400">{label}</p>
+        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${accent}`}>
+          <Icon className="h-4 w-4" />
+        </div>
       </div>
-      <div>
-        <p className="text-2xl font-semibold leading-tight text-zinc-900 dark:text-zinc-50">
-          {value}
-        </p>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">{label}</p>
-      </div>
+      <p className="text-2xl font-semibold leading-none text-zinc-900 dark:text-zinc-50">
+        {value.toLocaleString("pt-BR")}
+      </p>
     </div>
   );
 
   return href ? (
-    <a href={href} className="block">
+    <a href={href} className="block h-full">
       {content}
     </a>
   ) : (
@@ -305,6 +227,44 @@ export default async function Home({
     )
   );
 
+  const rows: LeadRow[] = pageItems.map((lead) => {
+    const summary = (countryFilter === "US" ? buildProblemSummaryEN : buildProblemSummary)({
+      performance_score: lead.performance_score,
+      is_slow: lead.is_slow,
+      is_outdated: lead.is_outdated,
+      is_wordpress: lead.is_wordpress,
+      is_broken: lead.is_broken,
+      broken_reason: lead.broken_reason,
+      notes: lead.site_notes,
+    });
+    const needsWhatsapp = !lead.email;
+    const templateForWhatsapp =
+      !lead.website || lead.social_platform ? whatsappTemplate : defaultTemplateByCategory.get(lead.category);
+    const waText =
+      needsWhatsapp && templateForWhatsapp
+        ? renderTemplate(templateForWhatsapp, {
+            name: lead.name,
+            category: lead.category,
+            address: lead.address,
+            problem: summary,
+          }).body
+        : undefined;
+    const waLink = needsWhatsapp && hasUsablePhone(lead.phone) ? whatsappLink(lead.phone, lead.country, waText) : null;
+    const hasPipelineStatus = !!lead.outreach_status && PIPELINE_STATUSES.includes(lead.outreach_status);
+    return {
+      lead,
+      score: computeLeadScore(lead),
+      isPriority: isPriorityProspect(lead),
+      isLandline: !!lead.phone && !isMobilePhone(lead.phone),
+      waLink,
+      // Lead sem email nao tem envio automatico (contato e na mao pelo
+      // WhatsApp), entao libera o funil manual pra quem tem WhatsApp.
+      showPipeline: hasPipelineStatus || !!waLink,
+      pipelineStatus: hasPipelineStatus ? lead.outreach_status! : "pending",
+      problem: summary,
+    };
+  });
+
   const baseParams = {
     category,
     status,
@@ -324,18 +284,27 @@ export default async function Home({
       <PageHeader active="/" />
 
       <main className="px-6 py-6">
-        <div className="mb-4 flex items-center justify-end">
-          <a
-            href={`/api/export${buildQuery(baseParams)}`}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50"
-          >
-            <Download className="h-4 w-4" />
-            Exportar CSV
-          </a>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Dashboard</h1>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              {countryFilter === "US" ? "🇺🇸 Leads dos EUA" : "🇧🇷 Leads do Brasil"}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={`/api/export${buildQuery(baseParams)}`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            >
+              <Download className="h-4 w-4" />
+              Exportar CSV
+            </a>
+            <SendOutreachButton pendingCount={pendingToSend} />
+          </div>
         </div>
 
         {/* Stat cards */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <StatCard
             icon={Users}
             label="leads no total"
@@ -376,11 +345,6 @@ export default async function Home({
           />
         </div>
 
-        {/* Send button */}
-        <div className="mt-4">
-          <SendOutreachButton pendingCount={pendingToSend} />
-        </div>
-
         {/* Filters */}
         <FilterForm
           categories={categories}
@@ -398,243 +362,37 @@ export default async function Home({
         </p>
 
         {/* Table */}
-        <div className="mt-2 overflow-x-auto rounded-xl border border-zinc-200 shadow-sm dark:border-zinc-800">
-          <table className="w-full border-collapse text-left text-sm">
+        <div className="mt-2 overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-black">
+          <table className="w-full table-fixed border-collapse text-left text-sm">
+            <colgroup>
+              <col className="w-28" />
+              <col />
+              <col className="w-48" />
+              <col className="w-40" />
+              <col className="w-48" />
+            </colgroup>
             <thead>
-              <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-                <th className="whitespace-nowrap px-4 py-3">
+              <tr className="bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
+                <th className="whitespace-nowrap py-3 pl-9 pr-2">
                   <SortableHeader field="score" label="Score" currentField={sortField} currentDir={sortDir} baseParams={baseParams} />
                 </th>
                 <th className="whitespace-nowrap px-4 py-3">
-                  <SortableHeader field="name" label="Nome" currentField={sortField} currentDir={sortDir} baseParams={baseParams} />
-                </th>
-                <th className="whitespace-nowrap px-4 py-3">
-                  <SortableHeader field="category" label="Categoria" currentField={sortField} currentDir={sortDir} baseParams={baseParams} />
+                  <span className="inline-flex items-center gap-2">
+                    <SortableHeader field="name" label="Empresa" currentField={sortField} currentDir={sortDir} baseParams={baseParams} />
+                    <span className="text-zinc-300 dark:text-zinc-700">/</span>
+                    <SortableHeader field="category" label="Categoria" currentField={sortField} currentDir={sortDir} baseParams={baseParams} />
+                  </span>
                 </th>
                 <th className="whitespace-nowrap px-4 py-3">
                   <SortableHeader field="phone" label="Telefone" currentField={sortField} currentDir={sortDir} baseParams={baseParams} />
                 </th>
-                <th className="whitespace-nowrap px-4 py-3">Site</th>
-                <th className="whitespace-nowrap px-4 py-3">Email</th>
-                <th className="whitespace-nowrap px-4 py-3">Status envio</th>
-                <th className="whitespace-nowrap px-4 py-3">Ações</th>
+                <th className="whitespace-nowrap px-4 py-3">
+                  <SortableHeader field="performance" label="Site" currentField={sortField} currentDir={sortDir} baseParams={baseParams} />
+                </th>
+                <th className="whitespace-nowrap px-4 py-3">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900">
-              {pageItems.map((lead) => {
-                const score = computeLeadScore(lead);
-                const needsWhatsapp = !lead.email;
-                const templateForWhatsapp =
-                  !lead.website || lead.social_platform
-                    ? whatsappTemplate
-                    : defaultTemplateByCategory.get(lead.category);
-                const waText =
-                  needsWhatsapp && templateForWhatsapp
-                    ? renderTemplate(templateForWhatsapp, {
-                        name: lead.name,
-                        category: lead.category,
-                        address: lead.address,
-                        problem: buildProblemSummary({
-                          performance_score: lead.performance_score,
-                          is_slow: lead.is_slow,
-                          is_outdated: lead.is_outdated,
-                          is_wordpress: lead.is_wordpress,
-                          is_broken: lead.is_broken,
-                          broken_reason: lead.broken_reason,
-                          notes: lead.site_notes,
-                        }),
-                      }).body
-                    : undefined;
-                const isLandline = !!lead.phone && !isMobilePhone(lead.phone);
-                const wa =
-                  needsWhatsapp && hasUsablePhone(lead.phone)
-                    ? whatsappLink(lead.phone, lead.country, waText)
-                    : null;
-                const hasPipelineStatus =
-                  !!lead.outreach_status && PIPELINE_STATUSES.includes(lead.outreach_status);
-                // Leads sem email não têm envio automático (é feito na mão
-                // pelo WhatsApp), então liberamos o pipeline manualmente
-                // pra quem tem um botão de WhatsApp disponível.
-                const showPipeline = hasPipelineStatus || !!wa;
-                const pipelineStatus = hasPipelineStatus ? lead.outreach_status! : "pending";
-
-                return (
-                  <tr
-                    key={lead.id}
-                    className={`transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/50 ${
-                      isPriorityProspect(lead) ? "bg-amber-50/60 dark:bg-amber-950/10" : "bg-white dark:bg-black"
-                    }`}
-                  >
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          score >= 80
-                            ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400"
-                            : score >= 40
-                              ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400"
-                              : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                        }`}
-                      >
-                        <Flame className="h-3 w-3" />
-                        {score}
-                      </span>
-                    </td>
-                    <td className="max-w-[220px] truncate px-4 py-3 font-medium text-zinc-900 dark:text-zinc-50">
-                      {lead.name}
-                      {lead.google_maps_url && (
-                        <a
-                          href={lead.google_maps_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Abrir no Google Maps"
-                          className="ml-1.5 text-xs font-normal text-blue-600 hover:underline dark:text-blue-400"
-                        >
-                          Maps
-                        </a>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                      {lead.category}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
-                        <span className="inline-flex items-center gap-1">
-                          <Phone className="h-3.5 w-3.5 text-zinc-400" />
-                          <EditablePhone leadId={lead.id} phone={lead.phone} />
-                        </span>
-                        {isLandline && (
-                          <span
-                            title="Formato de telefone fixo - pode ou não ter WhatsApp (comum em linhas VoIP/PABX de empresa)"
-                            className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-400"
-                          >
-                            fixo?
-                          </span>
-                        )}
-                        {wa && (
-                          <a
-                            href={wa}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:hover:bg-emerald-900"
-                          >
-                            <MessageCircle className="h-3 w-3" />
-                            WhatsApp
-                          </a>
-                        )}
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      {lead.website && lead.social_platform ? (
-                        <a
-                          href={lead.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Não é um site próprio: só um link de rede social"
-                          className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:hover:bg-amber-900"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          {lead.social_platform}
-                        </a>
-                      ) : lead.website ? (
-                        <div className="flex items-center gap-1.5">
-                          <a
-                            href={lead.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
-                          >
-                            <Globe className="h-3.5 w-3.5" />
-                            site
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                          {lead.is_broken && (
-                            <span
-                              title={lead.broken_reason ?? "site fora do ar"}
-                              className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-400"
-                            >
-                              <AlertTriangle className="h-3 w-3" />
-                              fora do ar
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                          <XCircle className="h-3.5 w-3.5" />
-                          sem site
-                        </span>
-                      )}
-                    </td>
-                    <td className="max-w-[200px] truncate px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                      <EditableEmail leadId={lead.id} email={lead.email} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col gap-1">
-                        {lead.outreach_status && STATUS_BADGES[lead.outreach_status] ? (
-                          (() => {
-                            const badge = STATUS_BADGES[lead.outreach_status];
-                            const BadgeIcon = badge.icon;
-                            return (
-                              <span
-                                className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${badge.className}`}
-                              >
-                                <BadgeIcon className="h-3 w-3" />
-                                {badge.label}
-                                {lead.outreach_status === "contacted" &&
-                                  ` · ${formatDate(lead.contacted_at)}`}
-                              </span>
-                            );
-                          })()
-                        ) : lead.email ? (
-                          <span className="inline-flex w-fit items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                            Pendente
-                          </span>
-                        ) : (
-                          <span className="text-zinc-400 dark:text-zinc-600">-</span>
-                        )}
-                        {lead.follow_up_sent_at && (
-                          <span className="inline-flex w-fit items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-400">
-                            <RotateCw className="h-3 w-3" />
-                            Follow-up {formatDate(lead.follow_up_sent_at)}
-                          </span>
-                        )}
-                        {lead.opened_at && (
-                          <span className="inline-flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-400">
-                            <Eye className="h-3 w-3" />
-                            Abriu {formatDate(lead.opened_at)}
-                          </span>
-                        )}
-                        {lead.clicked_at && (
-                          <span className="inline-flex w-fit items-center gap-1 rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700 dark:bg-pink-950 dark:text-pink-400">
-                            <MousePointerClick className="h-3 w-3" />
-                            Clicou {formatDate(lead.clicked_at)}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col items-start gap-1.5">
-                        <div className="flex items-center gap-0.5">
-                          {lead.outreach_status !== "ignored" && (
-                            <IgnoreButton leadId={lead.id} />
-                          )}
-                          <DeleteLeadButton leadId={lead.id} name={lead.name} />
-                        </div>
-                        {showPipeline && (
-                          <PipelineStageSelect
-                            leadId={lead.id}
-                            currentStatus={pipelineStatus}
-                          />
-                        )}
-                        <SendToCRMButton
-                          leadId={lead.id}
-                          synced={!!lead.crm_synced_at}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
+            <LeadsTableBody rows={rows} />
           </table>
         </div>
 

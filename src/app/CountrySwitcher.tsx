@@ -27,7 +27,7 @@ export function CountrySwitcher() {
   const country = useSelectedCountry();
 
   return (
-    <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-0.5 dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="flex rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 dark:border-zinc-800 dark:bg-zinc-900">
       {(
         [
           { value: "BR", label: "🇧🇷 Brasil" },
@@ -37,10 +37,10 @@ export function CountrySwitcher() {
         <button
           key={option.value}
           onClick={() => option.value !== country && selectCountry(option.value)}
-          className={`rounded-md px-2.5 py-1 text-sm font-medium transition-colors ${
+          className={`flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
             country === option.value
-              ? "bg-emerald-600 text-white"
-              : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
+              ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-50"
+              : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
           }`}
         >
           {option.label}

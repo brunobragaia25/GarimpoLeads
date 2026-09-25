@@ -36,3 +36,10 @@ input[type="date"] {
     color-scheme: dark;
   }
 }
+
+/* Reserva o espaco da barra lateral fixa (PageHeader) no desktop. */
+@media (min-width: 1024px) {
+  body:has([data-app-sidebar]) {
+    padding-left: 15rem;
+  }
+}
