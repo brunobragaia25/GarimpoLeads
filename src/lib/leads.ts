@@ -55,23 +55,41 @@ const MAX_LEADS = 5000;
 // email etc.) parecer travado assim que a tabela passou de 1000 linhas.
 const POSTGREST_PAGE_SIZE = 1000;
 
+// So as colunas que o app usa - "*" nos joins trazia ~60% a mais de dados.
+const LEAD_COLUMNS = [
+  "id, name, category, phone, address, website, google_maps_url, country, created_at, crm_synced_at",
+  "site_analysis(has_website, is_wordpress, performance_score, is_outdated, is_slow, is_broken, broken_reason, notes)",
+  "outreach(email, email_confidence, status, contacted_at, follow_up_sent_at, opened_at, clicked_at)",
+  "whatsapp_conversations(template_sent_at, followup_sent_at)",
+].join(", ");
+
 export async function getLeadsWithDetails(): Promise<LeadWithDetails[]> {
+  const { count, error: countError } = await supabase
+    .from("leads")
+    .select("id", { count: "exact", head: true });
+  if (countError) throw new Error(countError.message);
+
+  // Paginas buscadas em paralelo (antes era uma por vez, ~700ms cada - era o
+  // grosso da demora pra abrir dashboard e filas). "id" desempata a ordem,
+  // senao leads com o mesmo created_at podiam repetir/sumir entre paginas.
+  const total = Math.min(count ?? 0, MAX_LEADS);
+  const offsets: number[] = [];
+  for (let offset = 0; offset < total; offset += POSTGREST_PAGE_SIZE) offsets.push(offset);
+
+  const pages = await Promise.all(
+    offsets.map(async (offset) => {
+      const { data, error } = await supabase
+        .from("leads")
+        .select(LEAD_COLUMNS)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(offset, Math.min(offset + POSTGREST_PAGE_SIZE, MAX_LEADS) - 1);
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    })
+  );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows: any[] = [];
-
-  for (let offset = 0; offset < MAX_LEADS; offset += POSTGREST_PAGE_SIZE) {
-    const { data, error } = await supabase
-      .from("leads")
-      .select("*, site_analysis(*), outreach(*), whatsapp_conversations(*)")
-      .order("created_at", { ascending: false })
-      .range(offset, Math.min(offset + POSTGREST_PAGE_SIZE, MAX_LEADS) - 1);
-
-    if (error) throw new Error(error.message);
-    if (!data || data.length === 0) break;
-
-    rows.push(...data);
-    if (data.length < POSTGREST_PAGE_SIZE) break;
-  }
+  const rows: any[] = pages.flat();
 
   return rows.map((lead) => {
     const analysis = Array.isArray(lead.site_analysis) ? lead.site_analysis[0] : null;

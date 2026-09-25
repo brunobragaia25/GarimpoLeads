@@ -15,7 +15,7 @@ export interface QueueLead {
   message: string;
 }
 
-export function QueueClient({ leads }: { leads: QueueLead[] }) {
+export function QueueClient({ leads, total }: { leads: QueueLead[]; total: number }) {
   const router = useRouter();
   const [queueLeads, setQueueLeads] = useState(leads);
   const [index, setIndex] = useState(0);
@@ -24,7 +24,11 @@ export function QueueClient({ leads }: { leads: QueueLead[] }) {
   const [doneCount, setDoneCount] = useState(0);
 
   const current = queueLeads[index];
-  const remaining = queueLeads.length - index;
+  // Conta com o total real (so um lote veio pro navegador), descontando o
+  // que ja foi percorrido/excluido nessa sessao.
+  const removed = leads.length - queueLeads.length;
+  const remaining = Math.max(0, total - removed - index);
+  const batchDone = !queueLeads[index] && remaining > 0;
 
   async function markContactedAndAdvance() {
     if (!current) return;
@@ -68,17 +72,27 @@ export function QueueClient({ leads }: { leads: QueueLead[] }) {
       <div className="mt-10 flex flex-col items-center gap-3 rounded-xl border border-zinc-200 bg-white p-10 text-center dark:border-zinc-800 dark:bg-zinc-950">
         <CheckCircle2 className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
         <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Fila concluída!
+          {batchDone ? "Lote concluído!" : "Fila concluída!"}
         </p>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           {doneCount} lead(s) marcado(s) como contatado(s) nessa sessão.
+          {batchDone && ` Ainda restam ${remaining} na fila.`}
         </p>
-        <button
-          onClick={() => router.push("/")}
-          className="mt-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-zinc-50 dark:text-zinc-900"
-        >
-          Voltar ao dashboard
-        </button>
+        {batchDone ? (
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          >
+            Carregar próximo lote
+          </button>
+        ) : (
+          <button
+            onClick={() => router.push("/")}
+            className="mt-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-zinc-50 dark:text-zinc-900"
+          >
+            Voltar ao dashboard
+          </button>
+        )}
       </div>
     );
   }

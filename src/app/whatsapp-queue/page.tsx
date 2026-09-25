@@ -10,6 +10,8 @@ import type { Country } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+const QUEUE_BATCH_SIZE = 50;
+
 type SiteFilter = "all" | "with" | "without";
 
 function buildQueueHref({
@@ -88,7 +90,12 @@ export default async function WhatsappQueuePage({
     )
   );
 
+  // So um lote vai pro navegador: montar a mensagem de todos os elegiveis
+  // gerava ~4MB de HTML a cada acesso. Recarregar a pagina traz o proximo
+  // lote (quem ja foi marcado sai da lista).
+  const totalPending = pending.length;
   const queue: QueueLead[] = pending
+    .slice(0, QUEUE_BATCH_SIZE)
     .map((lead) => {
       const template = lead.website
         ? defaultTemplateByCategory.get(lead.category)
@@ -201,7 +208,7 @@ export default async function WhatsappQueuePage({
           />
         </div>
 
-        <QueueClient leads={queue} key={`${countryFilter}:${siteFilter}:${categoryFilter}`} />
+        <QueueClient leads={queue} total={totalPending} key={`${countryFilter}:${siteFilter}:${categoryFilter}`} />
       </main>
     </div>
   );
