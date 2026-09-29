@@ -126,7 +126,7 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
 
   // Exclui de vez sem voltar pro dashboard - o proximo lead ocupa a mesma
   // posicao, ja que a exclusao tira o item da lista em vez de avancar.
-  async function handleDelete() {
+  const handleDelete = useCallback(async () => {
     if (!current) return;
     if (!confirm(`Excluir o lead "${current.name}" permanentemente? Essa ação não pode ser desfeita.`)) return;
     setDeleting(true);
@@ -140,9 +140,9 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
     setQueueLeads((prev) => prev.filter((l) => l.id !== current.id));
     setOpened(false);
     setCopied(false);
-  }
+  }, [current]);
 
-  // Atalhos: W abre o WhatsApp, Enter marca e avanca, S pula.
+  // Atalhos: W abre o WhatsApp, Enter marca e avanca, S pula, Espaco exclui.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const target = e.target;
@@ -157,11 +157,16 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
       } else if (e.key === "s" || e.key === "S") {
         e.preventDefault();
         skip();
+      } else if (e.key === " ") {
+        // Sem isso o espaco rola a pagina - e o atalho tem que competir com
+        // esse comportamento padrao do navegador.
+        e.preventDefault();
+        handleDelete();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openWhatsapp, markContactedAndAdvance, skip]);
+  }, [openWhatsapp, markContactedAndAdvance, skip, handleDelete]);
 
   const undoBar = lastDone && (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
@@ -269,11 +274,12 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
             <button
               onClick={handleDelete}
               disabled={deleting}
-              title="Excluir lead"
+              title="Excluir lead (Espaço)"
               className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/40 dark:hover:text-red-400"
             >
               {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
               Excluir
+              <Kbd>Espaço</Kbd>
             </button>
           </header>
 
