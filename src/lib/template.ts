@@ -18,11 +18,11 @@ const DEFAULT_TEMPLATES: Record<string, MessageTemplate> = {
   // ---- Brasil
   "": {
     subject: "Uma nova versão do site da {{empresa}}",
-    body: "Olá! Eu me chamo Bruno e sou da DevzDesign (www.devzdesign.com.br), nós trabalhamos com desenvolvimento de websites.\n\nDei uma olhada no site da {{empresa}} e reparei que {{problema}}. Isso pode estar afastando quem pesquisa por {{categoria}} em {{cidade}}.\n\nNós desenvolvemos uma nova versão do site da sua empresa e queríamos saber se você está interessado em pelo menos ver, o preço falamos em um segundo momento.\n\nO que acha?\n\nAbraço,\nBruno Bragaia\nDevzDesign",
+    body: "Olá! Eu me chamo Bruno e sou da DevzDesign (www.devzdesign.com.br), nós trabalhamos com desenvolvimento de websites.\n\nDei uma olhada no site da {{empresa}} e reparei que {{problema}}. Isso pode estar afastando quem pesquisa por {{categoria}} em {{cidade}}.\n\nConsigo montar uma prévia de uma nova versão do site da sua empresa e queria saber se você tem interesse em pelo menos ver. O preço a gente fala depois.\n\nSe topar, é só responder \"sim\" que eu preparo e te mando.\n\nAbraço,\nBruno Bragaia\nDevzDesign",
   },
   __whatsapp_no_site__: {
     subject: "",
-    body: "Olá! Eu me chamo Bruno e sou da DevzDesign (www.devzdesign.com.br), nós trabalhamos com desenvolvimento de websites e estamos prospectando empresas que são bem avaliadas no google e que não possuem website que é um canal importante para captação de novos clientes.\n\nNós desenvolvemos um website para a sua empresa e queríamos saber se você está interessado em pelo menos ver, o preço falamos em um segundo momento.\n\nO que acha?",
+    body: "Olá! Eu me chamo Bruno e sou da DevzDesign (www.devzdesign.com.br), nós trabalhamos com desenvolvimento de websites e estamos prospectando empresas que são bem avaliadas no google e que não possuem website que é um canal importante para captação de novos clientes.\n\nConsigo montar um website para a sua empresa e queria saber se você tem interesse em pelo menos ver. O preço a gente fala depois.\n\nSe topar, é só responder \"sim\" que eu preparo e te mando.",
   },
   __followup__: {
     subject: "Re: sobre o site da {{empresa}}",
@@ -31,11 +31,11 @@ const DEFAULT_TEMPLATES: Record<string, MessageTemplate> = {
   // ---- EUA
   __default_us__: {
     subject: "A new version of {{empresa}}'s website",
-    body: "Hi! My name is Bruno, I'm with DevzDesign (www.devzdesign.com.br). We build websites.\n\nI took a look at {{empresa}}'s website and noticed that {{problema}}. That could be turning away people searching for {{categoria}} in {{cidade}}.\n\nWe've built a new version of your website and wanted to know if you'd be interested in at least taking a look. We can talk about pricing at a later stage.\n\nWhat do you think?\n\nBest,\nBruno",
+    body: "Hi! My name is Bruno, I run DevzDesign, a web design studio. We build websites.\n\nI took a look at {{empresa}}'s website and noticed that {{problema}}. That could be turning away people searching for {{categoria}} in {{cidade}}.\n\nI can put together a quick preview of a new version of your website, and wanted to know if you'd be interested in taking a look. We can talk about pricing at a later stage.\n\nJust reply \"yes\" and I'll get it ready for you.\n\nBest,\nBruno",
   },
   __no_site_us__: {
     subject: "A website for {{empresa}}",
-    body: "Hi! My name is Bruno, I'm with DevzDesign (www.devzdesign.com.br). We build websites, and we're reaching out to businesses that are well rated on Google but don't have a website yet - which is an important channel for getting new customers.\n\nWe've built a website for your business and wanted to know if you'd be interested in at least taking a look. We can talk about pricing at a later stage.\n\nWhat do you think?",
+    body: "Hi! My name is Bruno, I run DevzDesign, a web design studio. We build websites, and we're reaching out to businesses that are well rated on Google but don't have a website yet - which is an important channel for getting new customers.\n\nI can put together a website for your business and wanted to know if you'd be interested in taking a look. We can talk about pricing at a later stage.\n\nJust reply \"yes\" and I'll get started.",
   },
   __followup_us__: {
     subject: "Re: about {{empresa}}'s website",
@@ -44,11 +44,11 @@ const DEFAULT_TEMPLATES: Record<string, MessageTemplate> = {
   // ---- Portugal (portugues europeu)
   __default_pt__: {
     subject: "Uma nova versão do site da {{empresa}}",
-    body: "Olá! Chamo-me Bruno e sou da DevzDesign (www.devzdesign.com.br). Trabalhamos com desenvolvimento de websites.\n\nEstive a ver o site da {{empresa}} e reparei que {{problema}}. Isso pode estar a afastar quem procura {{categoria}} em {{cidade}}.\n\nDesenvolvemos uma nova versão do site da vossa empresa e gostaríamos de saber se têm interesse em, pelo menos, vê-la. O preço falamos num segundo momento.\n\nO que acham?\n\nCumprimentos,\nBruno Bragaia\nDevzDesign",
+    body: "Olá! Chamo-me Bruno e sou da DevzDesign (www.devzdesign.com.br). Trabalhamos com desenvolvimento de websites.\n\nEstive a ver o site da {{empresa}} e reparei que {{problema}}. Isso pode estar a afastar quem procura {{categoria}} em {{cidade}}.\n\nConseguimos preparar uma prévia de uma nova versão do site da vossa empresa e gostaríamos de saber se têm interesse em, pelo menos, vê-la. O preço falamos num segundo momento.\n\nSe topam, é só responder \"sim\" que preparamos e enviamos.\n\nCumprimentos,\nBruno Bragaia\nDevzDesign",
   },
   __no_site_pt__: {
     subject: "Um website para a {{empresa}}",
-    body: "Olá! Chamo-me Bruno e sou da DevzDesign (www.devzdesign.com.br). Trabalhamos com desenvolvimento de websites e estamos a contactar empresas bem avaliadas no Google que ainda não têm website, que é um canal importante para captar novos clientes.\n\nDesenvolvemos um website para a vossa empresa e gostaríamos de saber se têm interesse em, pelo menos, vê-lo. O preço falamos num segundo momento.\n\nO que acham?",
+    body: "Olá! Chamo-me Bruno e sou da DevzDesign (www.devzdesign.com.br). Trabalhamos com desenvolvimento de websites e estamos a contactar empresas bem avaliadas no Google que ainda não têm website, que é um canal importante para captar novos clientes.\n\nConseguimos preparar um website para a vossa empresa e gostaríamos de saber se têm interesse em, pelo menos, vê-lo. O preço falamos num segundo momento.\n\nSe topam, é só responder \"sim\" que preparamos e enviamos.",
   },
   __followup_pt__: {
     subject: "Re: sobre o site da {{empresa}}",
@@ -57,11 +57,11 @@ const DEFAULT_TEMPLATES: Record<string, MessageTemplate> = {
   // ---- Reino Unido
   __default_uk__: {
     subject: "A new version of {{empresa}}'s website",
-    body: "Hi! My name is Bruno, I'm with DevzDesign (www.devzdesign.com.br). We build websites.\n\nI had a look at {{empresa}}'s website and noticed that {{problema}}. That could be putting off people searching for {{categoria}} in {{cidade}}.\n\nWe've built a new version of your website and wanted to know if you'd be interested in at least having a look. We can talk about pricing at a later stage.\n\nWhat do you think?\n\nKind regards,\nBruno",
+    body: "Hi! My name is Bruno, I run DevzDesign, a web design studio. We build websites.\n\nI had a look at {{empresa}}'s website and noticed that {{problema}}. That could be putting off people searching for {{categoria}} in {{cidade}}.\n\nI can put together a quick preview of a new version of your website, and wanted to know if you'd be interested in having a look. We can talk about pricing at a later stage.\n\nJust reply \"yes\" and I'll get it ready for you.\n\nKind regards,\nBruno",
   },
   __no_site_uk__: {
     subject: "A website for {{empresa}}",
-    body: "Hi! My name is Bruno, I'm with DevzDesign (www.devzdesign.com.br). We build websites, and we're getting in touch with businesses that are well rated on Google but don't have a website yet - which is an important channel for winning new customers.\n\nWe've built a website for your business and wanted to know if you'd be interested in at least having a look. We can talk about pricing at a later stage.\n\nWhat do you think?",
+    body: "Hi! My name is Bruno, I run DevzDesign, a web design studio. We build websites, and we're getting in touch with businesses that are well rated on Google but don't have a website yet - which is an important channel for winning new customers.\n\nI can put together a website for your business and wanted to know if you'd be interested in having a look. We can talk about pricing at a later stage.\n\nJust reply \"yes\" and I'll get started.",
   },
   __followup_uk__: {
     subject: "Re: about {{empresa}}'s website",
