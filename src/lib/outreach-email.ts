@@ -20,7 +20,11 @@ export interface OutreachEmail {
 function senderLine(): string {
   const name = process.env.EMAIL_SENDER_NAME || "Bruno Bragaia";
   const company = process.env.EMAIL_SENDER_COMPANY || "DevzDesign";
-  const website = process.env.EMAIL_SENDER_WEBSITE || "www.devzdesign.com.br";
+  const rawWebsite = process.env.EMAIL_SENDER_WEBSITE || "www.devzdesign.com.br";
+  // Precisa comecar com "https://" pra virar link clicavel de verdade no
+  // e-mail (textToHtml em resend.ts so linka o que ja tem o protocolo) -
+  // sem isso a pessoa teria que copiar e digitar o endereco na mao.
+  const website = /^https?:\/\//i.test(rawWebsite) ? rawWebsite : `https://${rawWebsite}`;
   const address = process.env.EMAIL_SENDER_ADDRESS;
   return [name, company, website, address].filter(Boolean).join(" | ");
 }
