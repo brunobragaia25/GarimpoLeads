@@ -144,13 +144,16 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
     setCopied(false);
   }, [current]);
 
-  // So marca/desmarca favorito - nao mexe na posicao na fila, pra dar pra
-  // deixar guardado sem enviar agora e achar depois pelo filtro "Só
-  // favoritos".
+  // Favoritar tira o lead dessa visao (a fila normal exclui favoritado, e
+  // "Só favoritos" so mostra favoritado) - entao o lead sempre some daqui,
+  // igual a excluir, so que fica guardado pra achar depois pelo filtro em
+  // vez de ser apagado.
   const toggleStar = useCallback(() => {
     if (!current) return;
     const next = !current.starred;
-    setQueueLeads((prev) => prev.map((l) => (l.id === current.id ? { ...l, starred: next } : l)));
+    setQueueLeads((prev) => prev.filter((l) => l.id !== current.id));
+    setOpened(false);
+    setCopied(false);
     fetch(`/api/leads/${current.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

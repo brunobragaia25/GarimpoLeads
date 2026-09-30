@@ -34,6 +34,9 @@ export default async function WhatsappQueuePage({
   // verdade, então não vale gastar tempo manual nesses. País sempre
   // filtrado - nunca mistura BR e EUA na mesma fila. Filtro, contagem e
   // ordem (sem site primeiro) rodam no banco; só o lote vem pro app.
+  // Favoritado some da fila normal (fica guardado só na visao "Só
+  // favoritos", pra nao ficar reaparecendo no meio do que ainda falta
+  // decidir).
   const queueQuery: LeadQuery = {
     country: countryFilter,
     category: categoryFilter === "all" ? undefined : categoryFilter,
@@ -44,15 +47,17 @@ export default async function WhatsappQueuePage({
     excludeSocial: true,
     noSiteFirst: true,
     starredOnly: starredFilter,
+    excludeStarred: !starredFilter,
   };
 
   // So um lote vai pro navegador (montar a mensagem de todos os elegiveis
   // gerava ~4MB de HTML); recarregar a pagina traz o proximo.
-  const [categories, totalPending, pending, whatsappTemplate] = await Promise.all([
+  const [categories, totalPending, pending, whatsappTemplate, starredCount] = await Promise.all([
     getLeadCategories(countryFilter),
     countLeads(queueQuery),
     queryLeads(queueQuery, 0, QUEUE_BATCH_SIZE),
     getWhatsappNoSiteTemplate(countryFilter),
+    countLeads({ ...queueQuery, starredOnly: true, excludeStarred: false }),
   ]);
 
 
@@ -133,6 +138,7 @@ export default async function WhatsappQueuePage({
             category={categoryFilter}
             categories={categories}
             starred={starredFilter}
+            starredCount={starredCount}
           />
         </div>
 

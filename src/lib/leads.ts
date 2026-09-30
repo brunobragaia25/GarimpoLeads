@@ -73,6 +73,7 @@ export interface LeadQuery {
   search?: string;
   priorityOnly?: boolean;
   starredOnly?: boolean;
+  excludeStarred?: boolean;
   site?: "with" | "without" | "broken" | "";
   sentDate?: string;
   // Filtros usados pelas filas
@@ -120,7 +121,11 @@ function applyLeadQuery(query: any, q: LeadQuery) {
     query = query.ilike("name", `%${term}%`);
   }
   if (q.priorityOnly) query = query.eq("is_priority", true);
+  // starredOnly ("Só favoritos") e excludeStarred (fila normal, sem
+  // misturar quem foi guardado pra depois) sao mutuamente exclusivos -
+  // quem chama monta so um dos dois.
   if (q.starredOnly) query = query.eq("starred", true);
+  else if (q.excludeStarred) query = query.eq("starred", false);
   if (q.site === "with") query = query.not("website", "is", null);
   if (q.site === "without") query = query.is("website", null);
   if (q.site === "broken") query = query.eq("is_broken", true);

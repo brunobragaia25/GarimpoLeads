@@ -28,7 +28,8 @@ export default async function EmailQueuePage({
   const countryFilter = await getSelectedCountry();
 
   // Filtro e contagem no banco; so um lote vem pro app (recarregar traz o
-  // proximo - quem ja foi marcado sai da lista).
+  // proximo - quem ja foi marcado sai da lista). Favoritado some da fila
+  // normal, igual na fila de WhatsApp.
   const queueQuery: LeadQuery = {
     country: countryFilter,
     category: categoryFilter === "all" ? undefined : categoryFilter,
@@ -37,11 +38,13 @@ export default async function EmailQueuePage({
     hasEmail: true,
     noSiteFirst: true,
     starredOnly: starredFilter,
+    excludeStarred: !starredFilter,
   };
-  const [categories, totalPending, pending] = await Promise.all([
+  const [categories, totalPending, pending, starredCount] = await Promise.all([
     getLeadCategories(countryFilter),
     countLeads(queueQuery),
     queryLeads(queueQuery, 0, QUEUE_BATCH_SIZE),
+    countLeads({ ...queueQuery, starredOnly: true, excludeStarred: false }),
   ]);
 
 
@@ -111,6 +114,7 @@ export default async function EmailQueuePage({
             category={categoryFilter}
             categories={categories}
             starred={starredFilter}
+            starredCount={starredCount}
           />
         </div>
 

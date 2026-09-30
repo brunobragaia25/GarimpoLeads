@@ -23,12 +23,14 @@ export function QueueFilters({
   category,
   categories,
   starred = false,
+  starredCount = 0,
 }: {
   basePath: string;
   site: SiteFilter;
   category: string;
   categories: string[];
   starred?: boolean;
+  starredCount?: number;
 }) {
   const router = useRouter();
 
@@ -80,6 +82,17 @@ export function QueueFilters({
       >
         <Star className="h-4 w-4" fill={starred ? "currentColor" : "none"} />
         Só favoritos
+        {starredCount > 0 && (
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-xs font-semibold leading-none ${
+              starred
+                ? "bg-amber-200 text-amber-800 dark:bg-amber-900 dark:text-amber-300"
+                : "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+            }`}
+          >
+            {starredCount}
+          </span>
+        )}
       </Link>
     </div>
   );
