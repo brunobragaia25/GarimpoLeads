@@ -46,6 +46,7 @@ export interface LeadWithDetails {
   ps_lcp_ms: number | null;
   replied_at: string | null;
   reply_snippet: string | null;
+  starred: boolean;
 }
 
 // Lista vem da view lead_overview (supabase/lead_overview.sql): lead + ultima
@@ -53,7 +54,7 @@ export interface LeadWithDetails {
 // rede social). Filtro, ordenacao, paginacao e contagem rodam no banco -
 // antes o app baixava todos os leads a cada acesso e filtrava em memoria.
 const OVERVIEW_COLUMNS = [
-  "id, name, category, phone, address, website, google_maps_url, country, created_at, crm_synced_at",
+  "id, name, category, phone, address, website, google_maps_url, country, created_at, crm_synced_at, starred",
   "has_website, is_wordpress, performance_score, is_outdated, is_slow, is_broken, broken_reason, site_notes",
   "email, email_confidence, outreach_status, contacted_at, follow_up_sent_at, opened_at, clicked_at",
   "whatsapp_template_sent_at, whatsapp_followup_sent_at, social_platform",
@@ -71,6 +72,7 @@ export interface LeadQuery {
   status?: EmailFilter;
   search?: string;
   priorityOnly?: boolean;
+  starredOnly?: boolean;
   site?: "with" | "without" | "broken" | "";
   sentDate?: string;
   // Filtros usados pelas filas
@@ -118,6 +120,7 @@ function applyLeadQuery(query: any, q: LeadQuery) {
     query = query.ilike("name", `%${term}%`);
   }
   if (q.priorityOnly) query = query.eq("is_priority", true);
+  if (q.starredOnly) query = query.eq("starred", true);
   if (q.site === "with") query = query.not("website", "is", null);
   if (q.site === "without") query = query.is("website", null);
   if (q.site === "broken") query = query.eq("is_broken", true);

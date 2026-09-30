@@ -13,6 +13,7 @@ import {
   MessageCircle,
   Phone,
   SkipForward,
+  Star,
   Trash2,
   Undo2,
   XCircle,
@@ -26,6 +27,7 @@ export interface QueueLead {
   phone: string;
   website: string | null;
   mapsUrl: string | null;
+  starred: boolean;
   waLink: string;
   message: string;
 }
@@ -142,7 +144,22 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
     setCopied(false);
   }, [current]);
 
-  // Atalhos: W abre o WhatsApp, Enter marca e avanca, S pula, Espaco exclui.
+  // So marca/desmarca favorito - nao mexe na posicao na fila, pra dar pra
+  // deixar guardado sem enviar agora e achar depois pelo filtro "Só
+  // favoritos".
+  const toggleStar = useCallback(() => {
+    if (!current) return;
+    const next = !current.starred;
+    setQueueLeads((prev) => prev.map((l) => (l.id === current.id ? { ...l, starred: next } : l)));
+    fetch(`/api/leads/${current.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ starred: next }),
+    });
+  }, [current]);
+
+  // Atalhos: W abre o WhatsApp, Enter marca e avanca, S pula, Espaco exclui,
+  // F favorita.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const target = e.target;
@@ -162,11 +179,14 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
         // esse comportamento padrao do navegador.
         e.preventDefault();
         handleDelete();
+      } else if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        toggleStar();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openWhatsapp, markContactedAndAdvance, skip, handleDelete]);
+  }, [openWhatsapp, markContactedAndAdvance, skip, handleDelete, toggleStar]);
 
   const undoBar = lastDone && (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
@@ -271,16 +291,31 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
                 <p className="mt-2 text-xs leading-relaxed text-zinc-500">{current.address}</p>
               )}
             </div>
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              title="Excluir lead (Espaço)"
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/40 dark:hover:text-red-400"
-            >
-              {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-              Excluir
-              <Kbd>Espaço</Kbd>
-            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                onClick={toggleStar}
+                title="Marcar como favorito, pra achar depois (F)"
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
+                  current.starred
+                    ? "text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
+                    : "text-zinc-400 hover:bg-zinc-100 hover:text-amber-600 dark:hover:bg-zinc-900 dark:hover:text-amber-400"
+                }`}
+              >
+                <Star className="h-3.5 w-3.5" fill={current.starred ? "currentColor" : "none"} />
+                {current.starred ? "Favorito" : "Favoritar"}
+                <Kbd>F</Kbd>
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                title="Excluir lead (Espaço)"
+                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+              >
+                {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                Excluir
+                <Kbd>Espaço</Kbd>
+              </button>
+            </div>
           </header>
 
           <div className="p-6">
@@ -369,7 +404,12 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
                     className="flex w-full items-center justify-between gap-3 px-5 py-2.5 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-sm text-zinc-800 dark:text-zinc-200">{lead.name}</span>
+                      <span className="flex items-center gap-1.5 truncate text-sm text-zinc-800 dark:text-zinc-200">
+                        {lead.starred && (
+                          <Star className="h-3 w-3 shrink-0 fill-amber-500 text-amber-500" />
+                        )}
+                        <span className="truncate">{lead.name}</span>
+                      </span>
                       <span className="block truncate text-xs text-zinc-500">{lead.category}</span>
                     </span>
                     {!lead.website && (

@@ -27,6 +27,10 @@ alter table site_analysis add column if not exists ps_analyzed_at timestamptz;
 alter table outreach add column if not exists replied_at timestamptz;
 alter table outreach add column if not exists reply_snippet text;
 
+-- Favorito marcado manualmente (ex: fila de WhatsApp, lead que a pessoa
+-- quer guardar pra mandar depois, sem se perder no meio do lote).
+alter table leads add column if not exists starred boolean not null default false;
+
 create or replace view lead_overview with (security_invoker = true) as
 select
   l.id,
@@ -85,7 +89,8 @@ select
   sa.ps_mobile_score,
   sa.ps_lcp_ms,
   o.replied_at,
-  o.reply_snippet
+  o.reply_snippet,
+  l.starred
 from leads l
 left join lateral (
   select has_website, is_wordpress, performance_score, is_outdated, is_slow,

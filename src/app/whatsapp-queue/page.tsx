@@ -26,6 +26,7 @@ export default async function WhatsappQueuePage({
   const siteFilter: SiteFilter =
     params.site === "with" || params.site === "without" ? params.site : "all";
   const categoryFilter = params.category ?? "all";
+  const starredFilter = params.starred === "1";
   const countryFilter = await getSelectedCountry();
 
   // Fica de fora da fila quem só tem link de rede social (Instagram,
@@ -42,6 +43,7 @@ export default async function WhatsappQueuePage({
     usablePhoneOnly: true,
     excludeSocial: true,
     noSiteFirst: true,
+    starredOnly: starredFilter,
   };
 
   // So um lote vai pro navegador (montar a mensagem de todos os elegiveis
@@ -100,6 +102,7 @@ export default async function WhatsappQueuePage({
         phone: lead.phone!,
         website: lead.website,
         mapsUrl: lead.google_maps_url,
+        starred: lead.starred,
         waLink,
         message,
       };
@@ -124,10 +127,20 @@ export default async function WhatsappQueuePage({
             </div>
           </div>
 
-          <QueueFilters basePath="/whatsapp-queue" site={siteFilter} category={categoryFilter} categories={categories} />
+          <QueueFilters
+            basePath="/whatsapp-queue"
+            site={siteFilter}
+            category={categoryFilter}
+            categories={categories}
+            starred={starredFilter}
+          />
         </div>
 
-        <QueueClient leads={queue} total={totalPending} key={`${countryFilter}:${siteFilter}:${categoryFilter}`} />
+        <QueueClient
+          leads={queue}
+          total={totalPending}
+          key={`${countryFilter}:${siteFilter}:${categoryFilter}:${starredFilter}`}
+        />
       </main>
     </div>
   );

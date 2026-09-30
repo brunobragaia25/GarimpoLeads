@@ -17,7 +17,15 @@ export async function PATCH(
   }
 
   const { id: leadId } = await params;
-  const { phone, email } = await req.json().catch(() => ({}));
+  const { phone, email, starred } = await req.json().catch(() => ({}));
+
+  // Favorito manual (ex: fila de WhatsApp) - so troca essa coluna, nao mexe
+  // em outreach nem telefone.
+  if (typeof starred === "boolean") {
+    const { error } = await supabase.from("leads").update({ starred }).eq("id", leadId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
 
   // E-mail achado na mao (lead sem site, onde a raspagem nao acha nada):
   // grava/atualiza a linha de outreach do lead. Vazio limpa o e-mail.

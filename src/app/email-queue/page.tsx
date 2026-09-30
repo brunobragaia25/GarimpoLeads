@@ -24,6 +24,7 @@ export default async function EmailQueuePage({
   const params = await searchParams;
   const categoryFilter = params.category ?? "all";
   const siteFilter: SiteFilter = params.site === "with" || params.site === "without" ? params.site : "all";
+  const starredFilter = params.starred === "1";
   const countryFilter = await getSelectedCountry();
 
   // Filtro e contagem no banco; so um lote vem pro app (recarregar traz o
@@ -35,6 +36,7 @@ export default async function EmailQueuePage({
     site: siteFilter === "all" ? "" : siteFilter,
     hasEmail: true,
     noSiteFirst: true,
+    starredOnly: starredFilter,
   };
   const [categories, totalPending, pending] = await Promise.all([
     getLeadCategories(countryFilter),
@@ -80,6 +82,7 @@ export default async function EmailQueuePage({
       email: lead.email!,
       website: lead.website,
       mapsUrl: lead.google_maps_url,
+      starred: lead.starred,
       subject: rendered.subject,
       body: rendered.body,
     };
@@ -102,10 +105,20 @@ export default async function EmailQueuePage({
               </p>
             </div>
           </div>
-          <QueueFilters basePath="/email-queue" site={siteFilter} category={categoryFilter} categories={categories} />
+          <QueueFilters
+            basePath="/email-queue"
+            site={siteFilter}
+            category={categoryFilter}
+            categories={categories}
+            starred={starredFilter}
+          />
         </div>
 
-        <EmailQueueClient leads={queue} total={totalPending} key={`${countryFilter}:${siteFilter}:${categoryFilter}`} />
+        <EmailQueueClient
+          leads={queue}
+          total={totalPending}
+          key={`${countryFilter}:${siteFilter}:${categoryFilter}:${starredFilter}`}
+        />
       </main>
     </div>
   );
