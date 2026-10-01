@@ -79,6 +79,7 @@ export interface LeadQuery {
   // Filtros usados pelas filas
   hasEmail?: boolean;
   usablePhoneOnly?: boolean;
+  mobileOnly?: boolean;
   excludeSocial?: boolean;
   noSiteFirst?: boolean;
   sortField?: LeadSortField;
@@ -135,6 +136,7 @@ function applyLeadQuery(query: any, q: LeadQuery) {
   if (q.hasEmail === true) query = query.not("email", "is", null);
   if (q.hasEmail === false) query = query.is("email", null);
   if (q.usablePhoneOnly) query = query.eq("has_usable_phone", true);
+  if (q.mobileOnly) query = query.eq("is_mobile", true);
   if (q.excludeSocial) query = query.is("social_platform", null);
 
   const ascending = q.sortDir === "asc";

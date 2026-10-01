@@ -7,6 +7,7 @@ import {
   renderTemplate,
 } from "@/lib/template";
 import { whatsappLink } from "@/lib/phone";
+import { COUNTRIES } from "@/lib/countries";
 import { PageHeader } from "../PageHeader";
 import { QueueClient, type QueueLead } from "./QueueClient";
 import { QueueFilters, type SiteFilter } from "../QueueFilters";
@@ -44,6 +45,7 @@ export default async function WhatsappQueuePage({
     site: siteFilter === "all" ? "" : siteFilter,
     hasEmail: false,
     usablePhoneOnly: true,
+    mobileOnly: COUNTRIES[countryFilter].whatsappMobileOnly,
     excludeSocial: true,
     noSiteFirst: true,
     starredOnly: starredFilter,

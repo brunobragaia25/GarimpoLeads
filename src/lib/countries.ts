@@ -28,6 +28,13 @@ export interface CountryConfig {
   // DDI 55 do Brasil).
   minPhoneDigits: number;
   maxLocalDigits: number;
+  // Fila de WhatsApp so aceita numero com cara de celular de verdade. No
+  // Brasil fica false: muita empresa registra o WhatsApp Business num
+  // numero de formato fixo (VoIP/PABX virtual), entao filtrar por "parece
+  // celular" perderia leads bons. Em Portugal e Reino Unido a maioria dos
+  // telefones do Google Maps e fixo mesmo (sem WhatsApp nenhum) - sem esse
+  // filtro a fila ficava cheia de numero que nunca abre.
+  whatsappMobileOnly: boolean;
   // Chaves em message_templates.category dos textos especiais do pais.
   templateKeys: {
     default: string | null; // null = template padrao global (category null)
@@ -49,6 +56,7 @@ export const COUNTRIES: Record<Country, CountryConfig> = {
     stripTrunkZero: false,
     minPhoneDigits: 10,
     maxLocalDigits: 11,
+    whatsappMobileOnly: false,
     templateKeys: { default: null, noSite: "__whatsapp_no_site__", followUp: "__followup__" },
   },
   US: {
@@ -63,6 +71,7 @@ export const COUNTRIES: Record<Country, CountryConfig> = {
     stripTrunkZero: false,
     minPhoneDigits: 10,
     maxLocalDigits: 10,
+    whatsappMobileOnly: false,
     templateKeys: { default: "__default_us__", noSite: "__no_site_us__", followUp: "__followup_us__" },
   },
   PT: {
@@ -77,6 +86,7 @@ export const COUNTRIES: Record<Country, CountryConfig> = {
     stripTrunkZero: false,
     minPhoneDigits: 9,
     maxLocalDigits: 9,
+    whatsappMobileOnly: true,
     templateKeys: { default: "__default_pt__", noSite: "__no_site_pt__", followUp: "__followup_pt__" },
   },
   UK: {
@@ -91,6 +101,7 @@ export const COUNTRIES: Record<Country, CountryConfig> = {
     stripTrunkZero: true,
     minPhoneDigits: 10,
     maxLocalDigits: 11,
+    whatsappMobileOnly: true,
     templateKeys: { default: "__default_uk__", noSite: "__no_site_uk__", followUp: "__followup_uk__" },
   },
 };

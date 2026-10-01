@@ -65,7 +65,19 @@ select
   -- Portugal tem 9 digitos; os demais paises, 10+ (espelha minPhoneDigits
   -- em src/lib/countries.ts).
   (length(p.digits) >= case when l.country = 'PT' then 9 else 10 end) as has_usable_phone,
-  (length(p.local) = 11 and substr(p.local, 3, 1) = '9') as is_mobile,
+  -- Celular de verdade, por pais (formato de cada um e diferente - isso
+  -- NAO decide se o numero tem WhatsApp, so o "selo fixo?" e o filtro da
+  -- fila de WhatsApp em paises onde telefone fixo e maioria, ver
+  -- whatsappMobileOnly em src/lib/countries.ts).
+  case l.country
+    -- BR: DDD (2) + 9 + numero (8) = 11 digitos, 3o digito e o "9".
+    when 'BR' then (length(p.local) = 11 and substr(p.local, 3, 1) = '9')
+    -- PT: 9 digitos comecando em 9 (91/92/93/96).
+    when 'PT' then (length(p.local) = 9 and substr(p.local, 1, 1) = '9')
+    -- UK: 07xxx (com o 0 de tronco, como vem do Google) ou 7xxx sem ele.
+    when 'UK' then (p.local like '07%' or (length(p.local) = 10 and substr(p.local, 1, 1) = '7'))
+    else null
+  end as is_mobile,
   (
     sa.has_website is false
     or sp.social_platform is not null
