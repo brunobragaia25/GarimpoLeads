@@ -26,6 +26,14 @@ const STATUS_GROUPS: SelectGroup[] = [
     ],
   },
   {
+    label: "Engajamento no e-mail",
+    options: [
+      { value: "opened", label: "Abriu" },
+      { value: "clicked", label: "Clicou" },
+      { value: "follow_up", label: "Recebeu follow-up" },
+    ],
+  },
+  {
     label: "Andamento da venda",
     options: [
       { value: "responded", label: "Respondeu" },

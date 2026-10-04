@@ -112,6 +112,17 @@ function applyLeadQuery(query: any, q: LeadQuery) {
     case "pending":
       query = query.not("email", "is", null).eq("outreach_status", "pending");
       break;
+    // Engajamento no e-mail: sinal de abertura/clique (abertura pode ser
+    // robo, ver aviso no painel de Conversao).
+    case "opened":
+      query = query.not("opened_at", "is", null);
+      break;
+    case "clicked":
+      query = query.not("clicked_at", "is", null);
+      break;
+    case "follow_up":
+      query = query.not("follow_up_sent_at", "is", null);
+      break;
     default:
       query = query.eq("outreach_status", q.status);
   }
@@ -272,7 +283,10 @@ export type EmailFilter =
   | "meeting_scheduled"
   | "proposal_sent"
   | "closed_won"
-  | "closed_lost";
+  | "closed_lost"
+  | "opened"
+  | "clicked"
+  | "follow_up";
 
 // Numeros dos cards e lista de categorias mudam devagar e sao os calculos
 // mais caros (varrem a base inteira) - em cache por 60s, pra trocar de
