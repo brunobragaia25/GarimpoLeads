@@ -28,7 +28,7 @@ export function CountrySwitcher() {
   const country = useSelectedCountry();
 
   return (
-    <div className="grid grid-cols-4 gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="grid grid-cols-5 gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 dark:border-zinc-800 dark:bg-zinc-900">
       {COUNTRY_CODES.map((code) => {
         const { flag, shortName, name } = COUNTRIES[code];
         return (

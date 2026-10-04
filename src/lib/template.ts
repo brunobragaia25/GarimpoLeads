@@ -67,6 +67,19 @@ const DEFAULT_TEMPLATES: Record<string, MessageTemplate> = {
     subject: "Re: about {{empresa}}'s website",
     body: "Hi again,\n\nJust checking whether you had a chance to see my previous email about {{empresa}}'s website. Happy to have a chat if you're interested.\n\nKind regards,\nBruno",
   },
+  // ---- Brasileiros nos EUA (negocio de imigrante brasileiro)
+  __default_brus__: {
+    subject: "Uma nova versão do site da {{empresa}}",
+    body: "Olá! Eu me chamo Bruno, sou brasileiro e trabalho com desenvolvimento de sites pela DevzDesign (www.devzdesign.com.br).\n\nDei uma olhada no site da {{empresa}} e reparei que {{problema}}. Isso pode estar afastando quem pesquisa por {{categoria}} em {{cidade}}.\n\nConsigo montar uma prévia de uma nova versão do site da sua empresa e queria saber se você tem interesse em pelo menos ver. O preço a gente fala depois.\n\nSe topar, é só responder \"sim\" que eu preparo e te mando.\n\nAbraço,\nBruno Bragaia\nDevzDesign",
+  },
+  __no_site_brus__: {
+    subject: "Um site para a {{empresa}}",
+    body: "Olá! Eu me chamo Bruno, sou brasileiro e trabalho com desenvolvimento de sites pela DevzDesign (www.devzdesign.com.br). Estou entrando em contato com negócios de brasileiros nos Estados Unidos que são bem avaliados no Google mas ainda não têm site, que é um canal importante pra atrair cliente novo.\n\nConsigo montar um site para a sua empresa e queria saber se você tem interesse em pelo menos ver. O preço a gente fala depois.\n\nSe topar, é só responder \"sim\" que eu preparo e te mando.",
+  },
+  __followup_brus__: {
+    subject: "Re: sobre o site da {{empresa}}",
+    body: "Oi, tudo bem?\n\nPassando só pra saber se você chegou a ver meu email anterior sobre o site da {{empresa}}. Fico à disposição se quiser trocar uma ideia.\n\nAbraço,\nBruno",
+  },
 };
 
 // Chaves antigas continuam exportadas (usadas pela tela /template).

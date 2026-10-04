@@ -2,7 +2,7 @@
 // basicamente adicionar uma entrada nesse objeto (mais o texto padrao dos
 // templates em template.ts).
 
-export type Country = "BR" | "US" | "PT" | "UK";
+export type Country = "BR" | "US" | "PT" | "UK" | "BRUS";
 
 // Idioma das frases geradas pelo sistema (achado do site, rodape, pagina de
 // descadastro). pt-PT e separado do pt-BR porque o texto brasileiro ("pra",
@@ -103,6 +103,31 @@ export const COUNTRIES: Record<Country, CountryConfig> = {
     maxLocalDigits: 11,
     whatsappMobileOnly: true,
     templateKeys: { default: "__default_uk__", noSite: "__no_site_uk__", followUp: "__followup_uk__" },
+  },
+  // Negocio de brasileiro imigrante nos EUA (restaurante, mercado, corretor
+  // de imoveis etc). Geograficamente nos EUA (endereco/telefone no formato
+  // americano), mas quem atende costuma falar portugues e manter o habito
+  // de usar WhatsApp mesmo morando fora - os dois problemas do "US" normal
+  // (ninguem responde e-mail, ninguem usa WhatsApp) não se aplicam aqui.
+  BRUS: {
+    code: "BRUS",
+    name: "Brasileiros nos EUA",
+    shortName: "BR-EUA",
+    flag: "🇧🇷🇺🇸",
+    locale: "pt-BR",
+    // "en" pro endereco voltar em formato americano (extractCity ja sabe
+    // ler "Street, City, ST ZIP") - so o texto da mensagem e que e em
+    // portugues, a busca no Google Places e os dados do lugar ficam em ingles.
+    placesLanguage: "en",
+    searchJoin: "em",
+    ddi: "1",
+    stripTrunkZero: false,
+    minPhoneDigits: 10,
+    maxLocalDigits: 10,
+    // Numero americano nao da pra saber se e celular ou fixo pelo formato
+    // (igual ao US normal) - sem filtro, tenta WhatsApp em qualquer um.
+    whatsappMobileOnly: false,
+    templateKeys: { default: "__default_brus__", noSite: "__no_site_brus__", followUp: "__followup_brus__" },
   },
 };
 

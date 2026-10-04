@@ -44,7 +44,13 @@ describe("checagem de qualidade do e-mail", () => {
 describe("e-mail montado", () => {
   it.each(COUNTRY_CODES)("%s: sai sem bloqueio, com cidade e rodape com identificacao", (country) => {
     const isEn = country === "US" || country === "UK";
-    const address = { BR: "Rua X, 1 - Centro, Curitiba - PR, 80010-000, Brasil", US: "55 NE 5th St, Miami, FL 33132, USA", PT: "Av. X 61, 1600-082 Lisboa, Portugal", UK: "30 Chalton St, London NW1 1JB, UK" }[country];
+    const address = {
+      BR: "Rua X, 1 - Centro, Curitiba - PR, 80010-000, Brasil",
+      US: "55 NE 5th St, Miami, FL 33132, USA",
+      PT: "Av. X 61, 1600-082 Lisboa, Portugal",
+      UK: "30 Chalton St, London NW1 1JB, UK",
+      BRUS: "100 Biscayne Blvd, Miami, FL 33132, USA",
+    }[country];
     const email = buildOutreachEmail({
       template: isEn ? template.en : template.pt,
       country,

@@ -83,6 +83,7 @@ const PLACEHOLDERS: Record<Country, { category: string; city: string }> = {
   US: { category: "New category (ex: roofers)", city: "New city (ex: Tampa, FL)" },
   PT: { category: "Nova categoria (ex: ginásios)", city: "Nova cidade (ex: Aveiro)" },
   UK: { category: "New category (ex: roofers)", city: "New city (ex: Leeds)" },
+  BRUS: { category: "Nova categoria (ex: padaria brasileira)", city: "Nova cidade (ex: Atlanta, GA)" },
 };
 
 function CountryCard({ country }: { country: Country }) {
