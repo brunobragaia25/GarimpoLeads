@@ -2,57 +2,52 @@ import axios from "axios";
 import { Lead } from "./types";
 import { COUNTRIES, type Country } from "./countries";
 
-const PLACES_BASE = "https://maps.googleapis.com/maps/api/place";
+const PLACES_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 
 // Sem timeout, uma chamada travada na API do Google prende a funcao inteira
 // do cron ate o limite de 300s da Vercel matar ela sem gravar o log final.
 const REQUEST_TIMEOUT_MS = 15_000;
 
-interface TextSearchResult {
-  place_id: string;
-  name: string;
-  formatted_address?: string;
+// A Places API (New) devolve telefone e site no proprio Text Search, entao nao
+// precisa mais de uma chamada de Details por lead.
+const FIELD_MASK = [
+  "places.id",
+  "places.displayName",
+  "places.formattedAddress",
+  "places.nationalPhoneNumber",
+  "places.websiteUri",
+  "places.googleMapsUri",
+].join(",");
+
+interface PlaceResult {
+  displayName?: { text: string };
+  formattedAddress?: string;
+  nationalPhoneNumber?: string;
+  websiteUri?: string;
+  googleMapsUri?: string;
 }
 
-interface PlaceDetails {
-  formatted_phone_number?: string;
-  website?: string;
-  url?: string;
-}
-
-async function textSearch(query: string, language: string): Promise<TextSearchResult[]> {
-  const { data } = await axios.get(`${PLACES_BASE}/textsearch/json`, {
-    params: {
-      query,
-      key: process.env.GOOGLE_MAPS_API_KEY,
-      language,
-    },
-    timeout: REQUEST_TIMEOUT_MS,
-  });
-
-  if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-    throw new Error(`Places Text Search error: ${data.status} - ${data.error_message ?? ""}`);
+async function textSearch(query: string, language: string): Promise<PlaceResult[]> {
+  try {
+    const { data } = await axios.post(
+      PLACES_SEARCH_URL,
+      { textQuery: query, languageCode: language },
+      {
+        headers: {
+          "X-Goog-Api-Key": process.env.GOOGLE_MAPS_API_KEY,
+          "X-Goog-FieldMask": FIELD_MASK,
+        },
+        timeout: REQUEST_TIMEOUT_MS,
+      }
+    );
+    return data.places ?? [];
+  } catch (err) {
+    const apiError = axios.isAxiosError(err) ? err.response?.data?.error : undefined;
+    if (apiError) {
+      throw new Error(`Places Text Search error: ${apiError.status} - ${apiError.message ?? ""}`);
+    }
+    throw err;
   }
-
-  return data.results ?? [];
-}
-
-async function placeDetails(placeId: string, language: string): Promise<PlaceDetails> {
-  const { data } = await axios.get(`${PLACES_BASE}/details/json`, {
-    params: {
-      place_id: placeId,
-      fields: "formatted_phone_number,website,url",
-      key: process.env.GOOGLE_MAPS_API_KEY,
-      language,
-    },
-    timeout: REQUEST_TIMEOUT_MS,
-  });
-
-  if (data.status !== "OK") {
-    throw new Error(`Places Details error: ${data.status} - ${data.error_message ?? ""}`);
-  }
-
-  return data.result ?? {};
 }
 
 export async function searchLeads(category: string, location: string, country: Country = "BR"): Promise<Lead[]> {
@@ -60,20 +55,14 @@ export async function searchLeads(category: string, location: string, country: C
   const query = `${category} ${searchJoin} ${location}`;
   const results = await textSearch(query, language);
 
-  const leads: Lead[] = [];
-  for (const result of results) {
-    const details = await placeDetails(result.place_id, language);
-    leads.push({
-      name: result.name,
-      category,
-      phone: details.formatted_phone_number,
-      address: result.formatted_address,
-      website: details.website,
-      google_maps_url: details.url,
-      source: "google_maps",
-      country,
-    });
-  }
-
-  return leads;
+  return results.map((place) => ({
+    name: place.displayName?.text ?? "",
+    category,
+    phone: place.nationalPhoneNumber,
+    address: place.formattedAddress,
+    website: place.websiteUri,
+    google_maps_url: place.googleMapsUri,
+    source: "google_maps" as const,
+    country,
+  }));
 }

@@ -30,15 +30,21 @@ async function checkSupabase(): Promise<HealthCheckResult> {
 async function checkGoogleMaps(): Promise<HealthCheckResult> {
   try {
     const res = await withTimeout(
-      fetch(
-        `https://maps.googleapis.com/maps/api/place/textsearch/json?query=teste&key=${process.env.GOOGLE_MAPS_API_KEY}`
-      )
+      fetch("https://places.googleapis.com/v1/places:searchText", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": process.env.GOOGLE_MAPS_API_KEY ?? "",
+          "X-Goog-FieldMask": "places.id",
+        },
+        body: JSON.stringify({ textQuery: "teste", pageSize: 1 }),
+      })
     );
-    const data = await res.json();
-    if (data.status === "OK" || data.status === "ZERO_RESULTS") {
+    if (res.ok) {
       return { name: "Google Maps", ok: true, message: "Chave válida" };
     }
-    return { name: "Google Maps", ok: false, message: `${data.status}: ${data.error_message ?? ""}` };
+    const data = await res.json().catch(() => ({}));
+    return { name: "Google Maps", ok: false, message: `${data.error?.status ?? res.status}: ${data.error?.message ?? ""}` };
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";
     return { name: "Google Maps", ok: false, message };
