@@ -3,7 +3,7 @@ import {
   buildProblemSummaryFor,
   categoryTemplateKey,
   getTemplate,
-  getWhatsappNoSiteTemplate,
+  getNoSiteTemplates,
   renderTemplate,
 } from "@/lib/template";
 import { whatsappLink } from "@/lib/phone";
@@ -54,14 +54,18 @@ export default async function WhatsappQueuePage({
 
   // So um lote vai pro navegador (montar a mensagem de todos os elegiveis
   // gerava ~4MB de HTML); recarregar a pagina traz o proximo.
-  const [categories, totalPending, pending, whatsappTemplate, starredCount] = await Promise.all([
+  const [categories, totalPending, pending, starredCount] = await Promise.all([
     getLeadCategories(countryFilter),
     countLeads(queueQuery),
     queryLeads(queueQuery, 0, QUEUE_BATCH_SIZE),
-    getWhatsappNoSiteTemplate(countryFilter),
     countLeads({ ...queueQuery, starredOnly: true, excludeStarred: false }),
   ]);
 
+
+  const noSiteByCategory = await getNoSiteTemplates(
+    [...new Set(pending.filter((l) => !l.website).map((l) => l.category))],
+    countryFilter
+  );
 
   const categoriesNeedingDefaultTemplate = [
     ...new Set(pending.filter((l) => l.website).map((l) => l.category)),
@@ -78,7 +82,7 @@ export default async function WhatsappQueuePage({
     .map((lead) => {
       const template = lead.website
         ? defaultTemplateByCategory.get(lead.category)
-        : whatsappTemplate;
+        : noSiteByCategory.get(lead.category);
       if (!template) return null;
 
       const message = renderTemplate(template, {

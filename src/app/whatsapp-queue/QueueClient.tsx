@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -33,6 +33,22 @@ export interface QueueLead {
 }
 
 const UPCOMING_COUNT = 8;
+const BATCH_SIZE = 5;
+const BATCH_MODE_KEY = "whatsapp_queue_batch_mode";
+const BATCH_MODE_EVENT = "whatsapp-queue-batch-mode";
+
+function subscribeBatchMode(onChange: () => void) {
+  window.addEventListener(BATCH_MODE_EVENT, onChange);
+  return () => window.removeEventListener(BATCH_MODE_EVENT, onChange);
+}
+
+function readBatchMode(): boolean {
+  try {
+    return localStorage.getItem(BATCH_MODE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
@@ -51,7 +67,18 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
   const [doneCount, setDoneCount] = useState(0);
   const [opened, setOpened] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [lastDone, setLastDone] = useState<{ lead: QueueLead; index: number } | null>(null);
+  const [lastDone, setLastDone] = useState<{ leads: QueueLead[]; index: number } | null>(null);
+  const [batchOpened, setBatchOpened] = useState(false);
+  // Modo lote (abrir 5 abas de uma vez) e opcional e fica lembrado no navegador.
+  const batchMode = useSyncExternalStore(subscribeBatchMode, readBatchMode, () => false);
+
+  function toggleBatchMode() {
+    setBatchOpened(false);
+    try {
+      localStorage.setItem(BATCH_MODE_KEY, batchMode ? "0" : "1");
+    } catch {}
+    window.dispatchEvent(new Event(BATCH_MODE_EVENT));
+  }
 
   const current = queueLeads[index];
   const upcoming = queueLeads.slice(index + 1, index + 1 + UPCOMING_COUNT);
@@ -63,6 +90,7 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
 
   const goTo = useCallback((nextIndex: number) => {
     setIndex(nextIndex);
+    setBatchOpened(false);
     setOpened(false);
     setCopied(false);
   }, []);
@@ -83,9 +111,41 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
     });
     setLoading(false);
     setDoneCount((n) => n + 1);
-    setLastDone({ lead: current, index });
+    setLastDone({ leads: [current], index });
     goTo(index + 1);
   }, [current, loading, index, goTo]);
+
+  // Lote: abre o WhatsApp dos proximos BATCH_SIZE leads de uma vez (cada aba ja
+  // com a mensagem pronta). O navegador pode bloquear as abas extras na 1a vez -
+  // liberar pop-ups pro site resolve.
+  const openBatch = useCallback(() => {
+    if (!batchMode) return;
+    const batch = queueLeads.slice(index, index + BATCH_SIZE);
+    if (batch.length === 0) return;
+    for (const lead of batch) window.open(lead.waLink, "_blank", "noopener,noreferrer");
+    setBatchOpened(true);
+    setOpened(true);
+  }, [batchMode, queueLeads, index]);
+
+  const markBatchAndAdvance = useCallback(async () => {
+    const batch = queueLeads.slice(index, index + BATCH_SIZE);
+    if (!batchMode || batch.length === 0 || loading) return;
+    setLoading(true);
+    await Promise.all(
+      batch.map((lead) =>
+        fetch(`/api/leads/${lead.id}/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "contacted" }),
+        })
+      )
+    );
+    setLoading(false);
+    setDoneCount((n) => n + batch.length);
+    setLastDone({ leads: batch, index });
+    setBatchOpened(false);
+    goTo(index + batch.length);
+  }, [batchMode, queueLeads, index, loading, goTo]);
 
   const skip = useCallback(() => {
     if (!current) return;
@@ -95,13 +155,17 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
   async function undoLast() {
     if (!lastDone) return;
     setLoading(true);
-    await fetch(`/api/leads/${lastDone.lead.id}/status`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "pending" }),
-    });
+    await Promise.all(
+      lastDone.leads.map((lead) =>
+        fetch(`/api/leads/${lead.id}/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "pending" }),
+        })
+      )
+    );
     setLoading(false);
-    setDoneCount((n) => Math.max(0, n - 1));
+    setDoneCount((n) => Math.max(0, n - lastDone.leads.length));
     goTo(lastDone.index);
     setLastDone(null);
   }
@@ -171,6 +235,12 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
       if (e.key === "w" || e.key === "W") {
         e.preventDefault();
         openWhatsapp();
+      } else if (e.key === "b" || e.key === "B") {
+        e.preventDefault();
+        openBatch();
+      } else if (e.key === "m" || e.key === "M") {
+        e.preventDefault();
+        markBatchAndAdvance();
       } else if (e.key === "Enter") {
         e.preventDefault();
         markContactedAndAdvance();
@@ -189,14 +259,22 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openWhatsapp, markContactedAndAdvance, skip, handleDelete, toggleStar]);
+  }, [openWhatsapp, openBatch, markBatchAndAdvance, markContactedAndAdvance, skip, handleDelete, toggleStar]);
 
   const undoBar = lastDone && (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
       <span className="inline-flex min-w-0 items-center gap-2">
         <Check className="h-4 w-4 shrink-0" />
         <span className="truncate">
-          <strong className="font-medium">{lastDone.lead.name}</strong> marcado como contatado
+          {lastDone.leads.length > 1 ? (
+            <>
+              <strong className="font-medium">{lastDone.leads.length} leads</strong> marcados como contatados
+            </>
+          ) : (
+            <>
+              <strong className="font-medium">{lastDone.leads[0].name}</strong> marcado como contatado
+            </>
+          )}
         </span>
       </span>
       <button
@@ -363,9 +441,49 @@ export function QueueClient({ leads, total }: { leads: QueueLead[]; total: numbe
               Enviei, próximo
               <Kbd>Enter</Kbd>
             </button>
+            {batchMode && (
+              <>
+            <span className="hidden h-6 w-px bg-zinc-200 sm:block dark:bg-zinc-800" />
+            <button
+              onClick={openBatch}
+              title="Abre o WhatsApp dos próximos leads de uma vez (pode precisar liberar pop-ups)"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Abrir {Math.min(BATCH_SIZE, queueLeads.length - index)} de uma vez
+              <Kbd>B</Kbd>
+            </button>
+            <button
+              onClick={markBatchAndAdvance}
+              disabled={loading || !batchOpened}
+              title="Marca esses leads como contatados e avança"
+              className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 px-4 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Enviei os {Math.min(BATCH_SIZE, queueLeads.length - index)}, próximos
+              <Kbd>M</Kbd>
+            </button>
+              </>
+            )}
+            <button
+              onClick={toggleBatchMode}
+              role="switch"
+              aria-checked={batchMode}
+              title="Abre o WhatsApp de 5 leads de uma vez, em vez de um por um"
+              className="ml-auto inline-flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
+            >
+              <span
+                className={`relative h-5 w-9 rounded-full transition-colors ${batchMode ? "bg-emerald-600" : "bg-zinc-300 dark:bg-zinc-700"}`}
+              >
+                <span
+                  className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${batchMode ? "left-[18px]" : "left-0.5"}`}
+                />
+              </span>
+              Modo lote
+            </button>
             <button
               onClick={skip}
-              className="ml-auto inline-flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
             >
               <SkipForward className="h-4 w-4" />
               Pular

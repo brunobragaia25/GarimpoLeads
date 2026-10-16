@@ -5,10 +5,33 @@ import { PageHeader } from "../PageHeader";
 import { Check, Loader2, MapPin, Plus, Save, SlidersHorizontal, Tag, X } from "lucide-react";
 import { COUNTRIES, COUNTRY_CODES, type Country } from "@/lib/countries";
 
-function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
+function Chip({
+  label,
+  onRemove,
+  b2b,
+  onToggleB2b,
+}: {
+  label: string;
+  onRemove: () => void;
+  b2b?: boolean;
+  onToggleB2b?: () => void;
+}) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 py-1 pl-3 pr-1.5 text-sm text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+    <span className="group inline-flex items-center gap-1.5 rounded-full bg-zinc-100 py-1 pl-3 pr-1.5 text-sm text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
       {label}
+      {onToggleB2b && (
+        <button
+          onClick={onToggleB2b}
+          title={b2b ? "Usa a mensagem B2B (clique pra desmarcar)" : "Marcar como B2B (usa a mensagem B2B)"}
+          className={`rounded-full px-1.5 text-[10px] font-semibold leading-4 transition-colors ${
+            b2b
+              ? "bg-sky-600 text-white"
+              : "hidden text-zinc-400 group-hover:inline hover:bg-sky-100 hover:text-sky-700 dark:hover:bg-sky-950 dark:hover:text-sky-300"
+          }`}
+        >
+          B2B
+        </button>
+      )}
       <button
         onClick={onRemove}
         title="Remover"
@@ -73,6 +96,8 @@ function ListEditor({
   placeholder,
   onChange,
   groupByState = false,
+  b2b,
+  onToggleB2b,
 }: {
   title: string;
   icon: typeof Tag;
@@ -80,6 +105,8 @@ function ListEditor({
   placeholder: string;
   onChange: (items: string[]) => void;
   groupByState?: boolean;
+  b2b?: string[];
+  onToggleB2b?: (item: string) => void;
 }) {
   const [draft, setDraft] = useState("");
 
@@ -125,7 +152,13 @@ function ListEditor({
           />
         ))}
         {looseItems.map((item) => (
-          <Chip key={item} label={item} onRemove={() => onChange(items.filter((x) => x !== item))} />
+          <Chip
+            key={item}
+            label={item}
+            onRemove={() => onChange(items.filter((x) => x !== item))}
+            b2b={b2b?.includes(item)}
+            onToggleB2b={onToggleB2b && (() => onToggleB2b(item))}
+          />
         ))}
       </div>
       <div className="mt-3 flex gap-2">
@@ -169,6 +202,15 @@ function CountryCard({ country }: { country: Country }) {
   const [focusUntil, setFocusUntil] = useState<string | null>(null);
   const [focusDays, setFocusDays] = useState(7);
   const [focusChanged, setFocusChanged] = useState(false);
+  // Categorias marcadas como B2B (usam o template B2B).
+  const [b2b, setB2b] = useState<string[]>([]);
+  const [focusOpen, setFocusOpen] = useState(false);
+
+  function toggleB2b(item: string) {
+    setB2b((prev) => (prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]));
+    setDirty(true);
+    setSaved(false);
+  }
 
   useEffect(() => {
     fetch(`/api/config?country=${country}`)
@@ -177,6 +219,7 @@ function CountryCard({ country }: { country: Country }) {
         setCategories(data.categories ?? []);
         setCities(data.cities ?? []);
         setFocusCategories(data.focus?.categories ?? []);
+        setB2b(data.b2b ?? []);
         setFocusUntil(data.focus?.until ?? null);
         // O contador mostra os dias que FALTAM, entao baixa sozinho a cada dia.
         if (data.focus?.until) {
@@ -203,6 +246,7 @@ function CountryCard({ country }: { country: Country }) {
         country,
         categories,
         cities,
+        b2b,
         ...(focusChanged && {
           focus:
             focusCategories.length > 0
@@ -263,6 +307,8 @@ function CountryCard({ country }: { country: Country }) {
             items={categories}
             placeholder={PLACEHOLDERS[country].category}
             onChange={update(setCategories)}
+            b2b={b2b}
+            onToggleB2b={toggleB2b}
           />
           <ListEditor
             title="Cidades"
@@ -272,12 +318,29 @@ function CountryCard({ country }: { country: Country }) {
             onChange={update(setCities)}
             groupByState={country === "BRUS" || country === "US"}
           />
+          <div className="lg:col-span-2">
+            {!focusOpen ? (
+              <button
+                onClick={() => setFocusOpen(true)}
+                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  focusUntil && focusCategories.length > 0
+                    ? "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300"
+                    : "border-dashed border-zinc-300 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                }`}
+              >
+                {focusUntil && focusCategories.length > 0
+                  ? `Foco temporário ativo até ${new Date(focusUntil).toLocaleDateString("pt-BR")} · ${focusCategories.length} categorias · editar`
+                  : "+ Foco temporário (usar só algumas categorias por um tempo)"}
+              </button>
+            ) : (
           <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900 dark:bg-amber-950/20 lg:col-span-2">
             <ListEditor
               title="Foco temporário (substitui as categorias acima)"
               icon={Tag}
               items={focusCategories}
               placeholder="Ex: transportadoras; indústrias metalúrgicas"
+              b2b={b2b}
+              onToggleB2b={toggleB2b}
               onChange={(items) => {
                 setFocusCategories(items);
                 // Mexeu na lista: recomeca a contagem dos dias a partir de hoje.
@@ -312,6 +375,13 @@ function CountryCard({ country }: { country: Country }) {
                 </span>
               )}
             </div>
+          </div>
+            )}
+            {focusOpen && (
+              <button onClick={() => setFocusOpen(false)} className="mt-2 text-xs text-zinc-500 hover:underline">
+                Recolher
+              </button>
+            )}
           </div>
         </div>
       )}

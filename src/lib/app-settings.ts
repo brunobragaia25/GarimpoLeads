@@ -85,3 +85,26 @@ export async function takeFocusNotices(country: string): Promise<string[]> {
   }
   return [];
 }
+
+// Categorias marcadas como B2B por pais: leads dessas categorias usam o
+// template B2B em vez do padrao.
+const b2bKey = (country: string) => `b2b_categories_${country}`;
+
+export async function getB2bCategories(country: string): Promise<string[]> {
+  const { data } = await supabase.from("app_settings").select("value").eq("key", b2bKey(country)).maybeSingle();
+  if (!data?.value) return [];
+  try {
+    const list = JSON.parse(data.value);
+    return Array.isArray(list) ? list.filter((c): c is string => typeof c === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveB2bCategories(country: string, categories: string[]): Promise<void> {
+  const { error } = await supabase.from("app_settings").upsert(
+    { key: b2bKey(country), value: JSON.stringify(categories), updated_at: new Date().toISOString() },
+    { onConflict: "key" }
+  );
+  if (error) throw new Error(error.message);
+}

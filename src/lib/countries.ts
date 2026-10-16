@@ -145,6 +145,13 @@ export function parseCountry(value: unknown): Country {
 // mesmas palavras de categoria que Brasil/EUA ("dentistas", "dentists"),
 // entao ganham prefixo pra nao herdar o texto de outro pais. BR e EUA
 // continuam sem prefixo (templates que ja existem no banco).
+// Template B2B (pitch pra empresa que vende pra empresa), usado pelas
+// categorias marcadas como B2B em Configuracoes. Uma versao pra lead com site
+// e outra pra sem site, por pais.
+export function b2bTemplateKey(country: Country, noSite: boolean): string {
+  return `__b2b${noSite ? "_no_site" : ""}_${country.toLowerCase()}__`;
+}
+
 export function categoryTemplateKey(category: string, country: Country): string {
   return country === "BR" || country === "US" ? category : `${country}:${category}`;
 }

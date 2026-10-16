@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, isValidSessionCookie } from "@/lib/auth";
 import { getProspectionConfig, saveProspectionConfig } from "@/config/prospection";
 import { parseCountry } from "@/lib/countries";
-import { getActiveProspectionFocus, saveProspectionFocus } from "@/lib/app-settings";
+import { getActiveProspectionFocus, getB2bCategories, saveB2bCategories, saveProspectionFocus } from "@/lib/app-settings";
 
 async function isAuthorized(req: NextRequest): Promise<boolean> {
   const session = req.cookies.get(COOKIE_NAME)?.value;
@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
   const country = parseCountry(req.nextUrl.searchParams.get("country"));
   const config = await getProspectionConfig(country);
   const focus = await getActiveProspectionFocus(country);
-  return NextResponse.json({ ...config, focus });
+  const b2b = await getB2bCategories(country);
+  return NextResponse.json({ ...config, focus, b2b });
 }
 
 export async function POST(req: NextRequest) {
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { categories, cities, country, focus } = await req.json();
+  const { categories, cities, country, focus, b2b } = await req.json();
   if (!Array.isArray(categories) || !Array.isArray(cities)) {
     return NextResponse.json(
       { error: "categories e cities precisam ser arrays" },
@@ -41,6 +42,9 @@ export async function POST(req: NextRequest) {
       categories.filter((c) => typeof c === "string" && c.trim()),
       cities.filter((c) => typeof c === "string" && c.trim())
     );
+    if (Array.isArray(b2b)) {
+      await saveB2bCategories(parsedCountry, b2b.filter((c: unknown) => typeof c === "string" && c.trim()));
+    }
     // `focus` ausente = nao mexe; null = desliga; objeto = liga/atualiza.
     if (focus === null) {
       await saveProspectionFocus(parsedCountry, null);

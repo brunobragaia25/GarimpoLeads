@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "../PageHeader";
 import { useSelectedCountry } from "../CountrySwitcher";
 import { MessageSquareText, Save, Check, Info } from "lucide-react";
-import { COUNTRIES, COUNTRY_CODES, categoryTemplateKey } from "@/lib/countries";
+import { COUNTRIES, COUNTRY_CODES, b2bTemplateKey, categoryTemplateKey } from "@/lib/countries";
 
 export default function TemplatePage() {
   const country = useSelectedCountry();
@@ -126,6 +126,12 @@ export default function TemplatePage() {
             {keys && (
               <>
                 <option value={keys.noSite}>Leads sem site (WhatsApp / fila de email)</option>
+                {country && (
+                  <>
+                    <option value={b2bTemplateKey(country, false)}>B2B: empresas com site (categorias marcadas B2B)</option>
+                    <option value={b2bTemplateKey(country, true)}>B2B: empresas sem site (categorias marcadas B2B)</option>
+                  </>
+                )}
                 <option value={keys.followUp}>Follow-up (acompanhamento automático)</option>
               </>
             )}

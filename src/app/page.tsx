@@ -16,7 +16,7 @@ import {
   buildProblemSummaryFor,
   categoryTemplateKey,
   getTemplate,
-  getWhatsappNoSiteTemplate,
+  getNoSiteTemplates,
   renderTemplate,
 } from "@/lib/template";
 import { hasUsablePhone, mobileStatus, whatsappLink } from "@/lib/phone";
@@ -187,12 +187,11 @@ export default async function Home({
 
   // Contagem e pagina pedidas juntas; so se a pagina nao existir mais (ex:
   // filtro reduziu os resultados) busca de novo a ultima.
-  const [statsByCountry, categories, filteredCount, requestedItems, whatsappTemplate] = await Promise.all([
+  const [statsByCountry, categories, filteredCount, requestedItems] = await Promise.all([
     getLeadStats(),
     getLeadCategories(countryFilter),
     countLeads(leadQuery),
     queryLeads(leadQuery, (page - 1) * PAGE_SIZE, PAGE_SIZE),
-    getWhatsappNoSiteTemplate(countryFilter),
   ]);
 
   const stats = statsByCountry[countryFilter];
@@ -220,6 +219,10 @@ export default async function Home({
       pageItems.filter((l) => !l.email && l.website).map((l) => l.category)
     ),
   ];
+  const noSiteByCategory = await getNoSiteTemplates(
+    [...new Set(pageItems.filter((l) => !l.email && (!l.website || l.social_platform)).map((l) => l.category))],
+    countryFilter
+  );
   const defaultTemplateByCategory = new Map(
     await Promise.all(
       categoriesNeedingDefaultTemplate.map(
@@ -242,7 +245,7 @@ export default async function Home({
     });
     const needsWhatsapp = !lead.email;
     const templateForWhatsapp =
-      !lead.website || lead.social_platform ? whatsappTemplate : defaultTemplateByCategory.get(lead.category);
+      !lead.website || lead.social_platform ? noSiteByCategory.get(lead.category) : defaultTemplateByCategory.get(lead.category);
     const waText =
       needsWhatsapp && templateForWhatsapp
         ? renderTemplate(templateForWhatsapp, {

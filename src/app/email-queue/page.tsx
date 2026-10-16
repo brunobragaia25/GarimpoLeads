@@ -3,7 +3,7 @@ import {
   buildProblemSummaryFor,
   categoryTemplateKey,
   getTemplate,
-  getWhatsappNoSiteTemplate,
+  getNoSiteTemplates,
   renderTemplate,
 } from "@/lib/template";
 import { PageHeader } from "../PageHeader";
@@ -48,8 +48,8 @@ export default async function EmailQueuePage({
   ]);
 
 
-  const noSiteTemplate = await getWhatsappNoSiteTemplate(countryFilter);
   const categoriesNeedingTemplate = [...new Set(pending.map((l) => l.category))];
+  const noSiteByCategory = await getNoSiteTemplates(categoriesNeedingTemplate, countryFilter);
   const templateByCategory = new Map(
     await Promise.all(categoriesNeedingTemplate.map(async (c) => [c, await getTemplate(categoryTemplateKey(c, countryFilter), countryFilter)] as const))
   );
@@ -58,7 +58,7 @@ export default async function EmailQueuePage({
     // Sem site de verdade (nada ou so link de rede social): pitch de site
     // novo, em vez do texto que comenta o site existente.
     const noSite = !lead.website || lead.social_platform !== null;
-    const template = noSite ? noSiteTemplate : templateByCategory.get(lead.category)!;
+    const template = noSite ? noSiteByCategory.get(lead.category)! : templateByCategory.get(lead.category)!;
     const problem = buildProblemSummaryFor(countryFilter, {
       performance_score: lead.performance_score,
       is_slow: lead.is_slow,
