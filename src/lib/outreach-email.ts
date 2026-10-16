@@ -29,6 +29,21 @@ function senderLine(): string {
   return [name, company, website, address].filter(Boolean).join(" | ");
 }
 
+// WhatsApp como segundo caminho de resposta, so no e-mail: os templates sao
+// compartilhados com a fila de WhatsApp (onde o convite seria sem sentido),
+// entao o PS entra aqui na montagem do e-mail. EUA/UK nao usam WhatsApp.
+const WHATSAPP_PS: Partial<Record<Locale, string>> = {
+  "pt-BR": "PS: se preferir, me chama no WhatsApp:",
+  "pt-PT": "PS: se preferir, fale comigo no WhatsApp:",
+};
+
+function whatsappPs(country: Country): string {
+  const text = WHATSAPP_PS[COUNTRIES[country].locale];
+  if (!text) return "";
+  const number = (process.env.EMAIL_SENDER_WHATSAPP || "5511992656555").replace(/\D/g, "");
+  return `\n\n${text} https://wa.me/${number}`;
+}
+
 const FOOTER: Record<Locale, { why: string; unsubscribe: string }> = {
   en: {
     why: "You're receiving this because your business is listed publicly on Google Maps.",
@@ -92,7 +107,7 @@ export function buildOutreachEmail(input: {
     address: lead.address,
     problem: buildProblemSummaryFor(country, analysis),
   });
-  const body = `${rendered.body}\n\n${composeFooter(country, unsubscribeLink)}`;
+  const body = `${rendered.body}${whatsappPs(country)}\n\n${composeFooter(country, unsubscribeLink)}`;
   // A checagem olha o texto sem o link (a URL tem "token" e afins).
   // O nome usado no texto e o cortado no primeiro "|" (ver renderTemplate).
   const shownName = lead.name.split("|")[0].trim() || lead.name.trim();

@@ -20,20 +20,82 @@ function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
   );
 }
 
+// Estado com muitas cidades (ex: Flórida inteira) vira um chip so, pra nao
+// ocupar a tela toda. No banco continua a lista de cidades normal.
+const STATE_GROUP_MIN = 15;
+const STATE_NAMES: Record<string, string> = { FL: "Flórida" };
+
+function stateOf(city: string): string | null {
+  return city.match(/, ([A-Z]{2})$/)?.[1] ?? null;
+}
+
+function GroupChip({
+  label,
+  cities,
+  onRemove,
+}: {
+  label: string;
+  cities: string[];
+  onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="w-full rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/40">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+          {label} · estado inteiro ({cities.length} cidades)
+        </span>
+        <span className="flex items-center gap-3 text-xs">
+          <button onClick={() => setOpen(!open)} className="text-emerald-700 hover:underline dark:text-emerald-400">
+            {open ? "Ocultar cidades" : "Ver cidades"}
+          </button>
+          <button
+            onClick={() => window.confirm(`Remover ${cities.length} cidades de ${label}?`) && onRemove()}
+            className="text-red-600 hover:underline dark:text-red-400"
+          >
+            Remover estado
+          </button>
+        </span>
+      </div>
+      {open && (
+        <p className="mt-2 text-xs leading-relaxed text-emerald-900/80 dark:text-emerald-200/70">
+          {cities.map((c) => c.replace(/, [A-Z]{2}$/, "")).join(" · ")}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ListEditor({
   title,
   icon: Icon,
   items,
   placeholder,
   onChange,
+  groupByState = false,
 }: {
   title: string;
   icon: typeof Tag;
   items: string[];
   placeholder: string;
   onChange: (items: string[]) => void;
+  groupByState?: boolean;
 }) {
   const [draft, setDraft] = useState("");
+
+  const stateCounts = new Map<string, string[]>();
+  if (groupByState) {
+    for (const item of items) {
+      const st = stateOf(item);
+      if (st) stateCounts.set(st, [...(stateCounts.get(st) ?? []), item]);
+    }
+  }
+  const groups = [...stateCounts.entries()].filter(([, list]) => list.length >= STATE_GROUP_MIN);
+  const groupedStates = new Set(groups.map(([st]) => st));
+  const looseItems = items.filter((item) => {
+    const st = stateOf(item);
+    return !(st && groupedStates.has(st));
+  });
 
   function add() {
     // Aceita varios de uma vez separados por ";" ou quebra de linha.
@@ -54,7 +116,15 @@ function ListEditor({
       </h3>
       <div className="mt-3 flex flex-wrap gap-2">
         {items.length === 0 && <p className="text-sm text-zinc-400">Nenhum ainda.</p>}
-        {items.map((item) => (
+        {groups.map(([st, list]) => (
+          <GroupChip
+            key={st}
+            label={STATE_NAMES[st] ?? st}
+            cities={list}
+            onRemove={() => onChange(items.filter((x) => stateOf(x) !== st))}
+          />
+        ))}
+        {looseItems.map((item) => (
           <Chip key={item} label={item} onRemove={() => onChange(items.filter((x) => x !== item))} />
         ))}
       </div>
@@ -94,6 +164,11 @@ function CountryCard({ country }: { country: Country }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
+  // Foco temporario: null = desligado (nao mexe), senao categorias + dias.
+  const [focusCategories, setFocusCategories] = useState<string[]>([]);
+  const [focusUntil, setFocusUntil] = useState<string | null>(null);
+  const [focusDays, setFocusDays] = useState(7);
+  const [focusChanged, setFocusChanged] = useState(false);
 
   useEffect(() => {
     fetch(`/api/config?country=${country}`)
@@ -101,6 +176,12 @@ function CountryCard({ country }: { country: Country }) {
       .then((data) => {
         setCategories(data.categories ?? []);
         setCities(data.cities ?? []);
+        setFocusCategories(data.focus?.categories ?? []);
+        setFocusUntil(data.focus?.until ?? null);
+        // O contador mostra os dias que FALTAM, entao baixa sozinho a cada dia.
+        if (data.focus?.until) {
+          setFocusDays(Math.max(1, Math.ceil((new Date(data.focus.until).getTime() - Date.now()) / 86_400_000)));
+        }
         setLoading(false);
       });
   }, [country]);
@@ -118,8 +199,19 @@ function CountryCard({ country }: { country: Country }) {
     await fetch("/api/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ country, categories, cities }),
+      body: JSON.stringify({
+        country,
+        categories,
+        cities,
+        ...(focusChanged && {
+          focus:
+            focusCategories.length > 0
+              ? { categories: focusCategories, until: focusUntil ?? new Date(Date.now() + focusDays * 86_400_000).toISOString() }
+              : null,
+        }),
+      }),
     });
+    setFocusChanged(false);
     setSaving(false);
     setSaved(true);
     setDirty(false);
@@ -178,7 +270,49 @@ function CountryCard({ country }: { country: Country }) {
             items={cities}
             placeholder={PLACEHOLDERS[country].city}
             onChange={update(setCities)}
+            groupByState={country === "BRUS" || country === "US"}
           />
+          <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900 dark:bg-amber-950/20 lg:col-span-2">
+            <ListEditor
+              title="Foco temporário (substitui as categorias acima)"
+              icon={Tag}
+              items={focusCategories}
+              placeholder="Ex: transportadoras; indústrias metalúrgicas"
+              onChange={(items) => {
+                setFocusCategories(items);
+                // Mexeu na lista: recomeca a contagem dos dias a partir de hoje.
+                setFocusUntil(null);
+                setFocusChanged(true);
+                setDirty(true);
+                setSaved(false);
+              }}
+            />
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
+              <label className="inline-flex items-center gap-2">
+                Durante
+                <input
+                  type="number"
+                  min={1}
+                  max={90}
+                  value={focusDays}
+                  onChange={(e) => {
+                    setFocusDays(Math.max(1, Number(e.target.value) || 1));
+                    setFocusUntil(null);
+                    setFocusChanged(true);
+                    setDirty(true);
+                    setSaved(false);
+                  }}
+                  className="w-16 rounded-lg border border-zinc-300 bg-white px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+                />
+                {focusUntil ? "dias restantes" : "dias a partir de hoje"}
+              </label>
+              {focusUntil && focusCategories.length > 0 && (
+                <span className="text-amber-700 dark:text-amber-400">
+                  Ativo até {new Date(focusUntil).toLocaleDateString("pt-BR")} (faltam {focusDays} {focusDays === 1 ? "dia" : "dias"}); depois volta pra lista normal. Aviso no Telegram 1 dia antes e quando acabar.
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </section>

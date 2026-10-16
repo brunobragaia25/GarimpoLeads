@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { Country } from "@/lib/types";
+import { getActiveProspectionFocus } from "@/lib/app-settings";
 
 // Usados como fallback pro BR se a tabela `prospection_config` estiver
 // vazia pro pais, e como sugestao inicial na tela de configuracoes do
@@ -127,7 +128,10 @@ export async function getPairsForDay(
   count: number,
   country: Country = "BR"
 ): Promise<CategoryCityPair[]> {
-  const { categories: configCategories, cities } = await getProspectionConfig(country);
+  const { categories: normalCategories, cities } = await getProspectionConfig(country);
+  // Foco temporario ativo (ex: semana so de B2B) substitui a lista normal.
+  const focus = await getActiveProspectionFocus(country);
+  const configCategories = focus ? focus.categories : normalCategories;
 
   // Ordena as categorias da que mais traz lead sem site pra que menos traz -
   // como o loop abaixo e "categoria por fora, cidade por dentro", categoria

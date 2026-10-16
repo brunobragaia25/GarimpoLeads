@@ -7,6 +7,7 @@ import { getPairsForDay, getProspectionConfig } from "@/config/prospection";
 import { COUNTRIES, COUNTRY_CODES, type Country } from "@/lib/countries";
 import { notifyTelegram } from "@/lib/telegram";
 import { checkReplies } from "@/lib/reply-tracker";
+import { takeFocusNotices } from "@/lib/app-settings";
 
 export const maxDuration = 300;
 
@@ -111,6 +112,15 @@ export async function GET(req: NextRequest) {
     } catch (err) {
       const message = err instanceof Error ? err.message : "erro desconhecido";
       errors.push(`getPairsForDay: ${message}`);
+    }
+
+    // Avisos do foco temporario (falta 1 dia / acabou) - uma vez so cada.
+    try {
+      for (const country of COUNTRY_CODES) {
+        for (const notice of await takeFocusNotices(country)) await notifyTelegram(notice);
+      }
+    } catch (err) {
+      errors.push(`focus-notices: ${err instanceof Error ? err.message : "erro desconhecido"}`);
     }
 
     for (const { category, location, country } of pairs) {
