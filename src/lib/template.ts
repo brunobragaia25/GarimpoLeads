@@ -23,7 +23,7 @@ const DEFAULT_TEMPLATES: Record<string, MessageTemplate> = {
   },
   __whatsapp_no_site__: {
     subject: "",
-    body: "{Olá!|Oi!|Olá, tudo bem?} Eu me chamo Bruno e sou da DevzDesign (www.devzdesign.com.br), {nós trabalhamos com|trabalho com} desenvolvimento de websites e estamos entrando em contato com empresas bem avaliadas no Google que ainda não têm website, um canal importante para captar novos clientes.\n\n{Posso montar|Posso preparar} uma prévia de um site para a sua empresa? {É de graça|Não tem custo|É sem custo}, você vê e decide se faz sentido. {É só me responder por aqui.|Se tiver interesse, é só responder por aqui.|Me responde por aqui se quiser ver.}",
+    body: "{Olá!|Oi!|Olá, tudo bem?} Eu me chamo Bruno e sou da DevzDesign (www.devzdesign.com.br). {Procurei|Pesquisei} a {{empresa}} no Google e {percebi|notei} que vocês ainda não têm um site.\n\n{Eu ajudo|Ajudo} empresas locais a criarem sites personalizados para aparecer melhor no Google e conquistar mais clientes. {Gostaria de mostrar|Posso te mostrar} alguns dos trabalhos que já desenvolvi? {É só me responder por aqui.|Se tiver interesse, é só responder por aqui.|Me responde por aqui se quiser ver.}",
   },
   __followup__: {
     subject: "Re: sobre o site da {{empresa}}",
@@ -36,7 +36,7 @@ const DEFAULT_TEMPLATES: Record<string, MessageTemplate> = {
   },
   __no_site_us__: {
     subject: "A website for {{empresa}}",
-    body: "{Hi!|Hello!|Hi there!} My name is Bruno, I run DevzDesign, a web design studio. We build websites, and we're reaching out to businesses that are well rated on Google but don't have a website yet - which is an important channel for getting new customers.\n\n{Can I put together|Would you like me to put together} a quick preview of a website for {{empresa}}? {It's free|There's no cost}, and you can decide if it makes sense. Just reply to this email.",
+    body: "{Hi!|Hello!|Hi there!} My name is Bruno, I run DevzDesign, a web design studio. I {searched for|looked up} {{empresa}} on Google and noticed you don't have a website yet.\n\nI help local businesses get custom websites that rank better on Google and bring in more customers. {Can I show you|Would you like to see} some of the work I've done? Just reply to this email.",
   },
   __followup_us__: {
     subject: "Re: about {{empresa}}'s website",
@@ -45,11 +45,11 @@ const DEFAULT_TEMPLATES: Record<string, MessageTemplate> = {
   // ---- Portugal (portugues europeu)
   __default_pt__: {
     subject: "Uma nova versão do site da {{empresa}}",
-    body: "{Olá!|Bom dia!|Boa tarde!} Chamo-me Bruno e sou da DevzDesign (www.devzdesign.com.br). Trabalhamos com desenvolvimento de websites.\n\n{Estive a ver|Dei uma vista de olhos a} o site da {{empresa}} e {reparei|notei} que {{problema}}. Isso pode estar a afastar quem procura {{categoria}} em {{cidade}}.\n\n{Posso enviar-lhe|Posso mandar-lhe} uma prévia de como ficaria um site novo para a {{empresa}}? {É gratuito|Não tem custos}, vê e decide se faz sentido.\n\n{Cumprimentos|Com os melhores cumprimentos},\nBruno Bragaia\nDevzDesign",
+    body: "{Olá!|Olá, tudo bem?|Olá, como vai?} Chamo-me Bruno e sou da DevzDesign (www.devzdesign.com.br). Trabalhamos com desenvolvimento de websites.\n\n{Estive a ver|Dei uma vista de olhos a} o site da {{empresa}} e {reparei|notei} que {{problema}}. Isso pode estar a afastar quem procura {{categoria}} em {{cidade}}.\n\n{Posso enviar-lhe|Posso mandar-lhe} uma prévia de como ficaria um site novo para a {{empresa}}? {É gratuito|Não tem custos}, vê e decide se faz sentido.\n\n{Cumprimentos|Com os melhores cumprimentos},\nBruno Bragaia\nDevzDesign",
   },
   __no_site_pt__: {
     subject: "Um website para a {{empresa}}",
-    body: "{Olá!|Bom dia!|Boa tarde!} Chamo-me Bruno e sou da DevzDesign (www.devzdesign.com.br). Trabalhamos com desenvolvimento de websites e estamos a contactar empresas bem avaliadas no Google que ainda não têm website, um canal importante para captar novos clientes.\n\n{Posso preparar|Posso fazer} uma prévia de um website para a vossa empresa? {É gratuito|Não tem custos}, vê e decide se faz sentido. {Basta responder a esta mensagem.|Se tiver interesse, basta responder por aqui.}",
+    body: "{Olá!|Olá, tudo bem?|Olá, como vai?} Chamo-me Bruno e sou da DevzDesign (www.devzdesign.com.br). {Pesquisei|Procurei} a {{empresa}} no Google e {reparei|notei} que ainda não têm website.\n\nAjudo empresas locais a criarem websites personalizados para aparecerem melhor no Google e conquistarem mais clientes. {Gostaria de mostrar-lhe|Posso mostrar-lhe} alguns dos trabalhos que já desenvolvi? {Basta responder a esta mensagem.|Se tiver interesse, basta responder por aqui.}",
   },
   __followup_pt__: {
     subject: "Re: sobre o site da {{empresa}}",
@@ -62,7 +62,7 @@ const DEFAULT_TEMPLATES: Record<string, MessageTemplate> = {
   },
   __no_site_uk__: {
     subject: "A website for {{empresa}}",
-    body: "{Hi!|Hello!|Hi there!} My name is Bruno, I run DevzDesign, a web design studio. We build websites, and we're reaching out to businesses that are well rated on Google but don't have a website yet - which is an important channel for getting new customers.\n\n{Can I put together|Would you like me to put together} a quick preview of a website for {{empresa}}? {It's free|There's no cost}, and you can decide if it makes sense. Just reply to this email.",
+    body: "{Hi!|Hello!|Hi there!} My name is Bruno, I run DevzDesign, a web design studio. I {searched for|looked up} {{empresa}} on Google and noticed you don't have a website yet.\n\nI help local businesses get custom websites that rank better on Google and bring in more customers. {Can I show you|Would you like to see} some of the work I've done? Just reply to this email.",
   },
   __followup_uk__: {
     subject: "Re: about {{empresa}}'s website",
@@ -75,7 +75,7 @@ const DEFAULT_TEMPLATES: Record<string, MessageTemplate> = {
   },
   __no_site_brus__: {
     subject: "Um site para a {{empresa}}",
-    body: "{Olá!|Oi!|Olá, tudo bem?} Eu me chamo Bruno, sou brasileiro e trabalho com desenvolvimento de sites pela DevzDesign (www.devzdesign.com.br). Estou entrando em contato com negócios de brasileiros nos Estados Unidos que são bem avaliados no Google mas ainda não têm site, um canal importante pra atrair cliente novo.\n\n{Posso montar|Posso preparar} uma prévia de um site para a sua empresa? {É de graça|Não tem custo|É sem custo}, você vê e decide se faz sentido. {É só me responder por aqui.|Se tiver interesse, é só responder por aqui.|Me responde por aqui se quiser ver.}",
+    body: "{Olá!|Oi!|Olá, tudo bem?} Eu me chamo Bruno, sou brasileiro e trabalho com desenvolvimento de sites pela DevzDesign (www.devzdesign.com.br). {Procurei|Pesquisei} a {{empresa}} no Google e {percebi|notei} que vocês ainda não têm um site.\n\nEu ajudo negócios locais a criarem sites personalizados pra aparecer melhor no Google e conquistar mais clientes. {Gostaria de mostrar|Posso te mostrar} alguns dos trabalhos que já desenvolvi? {É só me responder por aqui.|Se tiver interesse, é só responder por aqui.|Me responde por aqui se quiser ver.}",
   },
   __followup_brus__: {
     subject: "Re: sobre o site da {{empresa}}",
@@ -84,27 +84,27 @@ const DEFAULT_TEMPLATES: Record<string, MessageTemplate> = {
   // ---- B2B (pitch pra empresa que vende pra empresa; categorias marcadas em Configuracoes)
   __b2b_br__: {
     subject: "Site institucional da {{empresa}}",
-    body: "{Olá!|Bom dia!|Boa tarde!} Meu nome é Bruno, sou da DevzDesign (www.devzdesign.com.br). Fazemos sites institucionais para empresas que vendem para outras empresas.\n\nDei uma olhada na presença online da {{empresa}} e {{problema}}. Hoje, quem procura {{categoria}} em {{cidade}} costuma pesquisar o fornecedor no Google antes de pedir orçamento, e um site que passe credibilidade e facilite o pedido de cotação pesa nessa decisão.\n\nPosso te mandar uma prévia de como ficaria o site da {{empresa}}, com serviços, portfólio e formulário de orçamento? É sem custo, você avalia e decide.\n\n{Atenciosamente|Abraço},\nBruno Bragaia\nDevzDesign",
+    body: "{Olá!|{{saudacao}}!|Olá, tudo bem?} Meu nome é Bruno, sou da DevzDesign (www.devzdesign.com.br). Fazemos sites institucionais para empresas que vendem para outras empresas.\n\nDei uma olhada na presença online da {{empresa}} e {{problema}}. Hoje, quem procura {{categoria}} em {{cidade}} costuma pesquisar o fornecedor no Google antes de pedir orçamento, e um site que passe credibilidade e facilite o pedido de cotação pesa nessa decisão.\n\nPosso te mandar uma prévia de como ficaria o site da {{empresa}}, com serviços, portfólio e formulário de orçamento? É sem custo, você avalia e decide.\n\n{Atenciosamente|Abraço},\nBruno Bragaia\nDevzDesign",
   },
   __b2b_no_site_br__: {
     subject: "Um site para a {{empresa}}",
-    body: "{Olá!|Bom dia!|Boa tarde!} Meu nome é Bruno, sou da DevzDesign (www.devzdesign.com.br). Fazemos sites institucionais para empresas que vendem para outras empresas.\n\nNotei que a {{empresa}} ainda não tem site. Hoje, quem procura {{categoria}} em {{cidade}} costuma pesquisar o fornecedor no Google antes de pedir orçamento, e um site que passe credibilidade e facilite o pedido de cotação pesa nessa decisão.\n\nPosso montar uma prévia do site da {{empresa}}, com serviços, portfólio e formulário de orçamento? É sem custo, você avalia e decide. {É só me responder por aqui.|Se tiver interesse, é só responder por aqui.}",
+    body: "{Olá!|{{saudacao}}!|Olá, tudo bem?} Meu nome é Bruno, sou da DevzDesign (www.devzdesign.com.br). Fazemos sites institucionais para empresas que vendem para outras empresas.\n\nNotei que a {{empresa}} ainda não tem site. Hoje, quem procura {{categoria}} em {{cidade}} costuma pesquisar o fornecedor no Google antes de pedir orçamento, e um site que passe credibilidade e facilite o pedido de cotação pesa nessa decisão.\n\nPosso montar uma prévia do site da {{empresa}}, com serviços, portfólio e formulário de orçamento? É sem custo, você avalia e decide. {É só me responder por aqui.|Se tiver interesse, é só responder por aqui.}",
   },
   __b2b_brus__: {
     subject: "Site institucional da {{empresa}}",
-    body: "{Olá!|Bom dia!|Boa tarde!} Meu nome é Bruno, sou da DevzDesign (www.devzdesign.com.br). Fazemos sites institucionais para empresas que vendem para outras empresas.\n\nDei uma olhada na presença online da {{empresa}} e {{problema}}. Hoje, quem procura {{categoria}} em {{cidade}} costuma pesquisar o fornecedor no Google antes de pedir orçamento, e um site que passe credibilidade e facilite o pedido de cotação pesa nessa decisão.\n\nPosso te mandar uma prévia de como ficaria o site da {{empresa}}, com serviços, portfólio e formulário de orçamento? É sem custo, você avalia e decide.\n\n{Atenciosamente|Abraço},\nBruno Bragaia\nDevzDesign",
+    body: "{Olá!|{{saudacao}}!|Olá, tudo bem?} Meu nome é Bruno, sou da DevzDesign (www.devzdesign.com.br). Fazemos sites institucionais para empresas que vendem para outras empresas.\n\nDei uma olhada na presença online da {{empresa}} e {{problema}}. Hoje, quem procura {{categoria}} em {{cidade}} costuma pesquisar o fornecedor no Google antes de pedir orçamento, e um site que passe credibilidade e facilite o pedido de cotação pesa nessa decisão.\n\nPosso te mandar uma prévia de como ficaria o site da {{empresa}}, com serviços, portfólio e formulário de orçamento? É sem custo, você avalia e decide.\n\n{Atenciosamente|Abraço},\nBruno Bragaia\nDevzDesign",
   },
   __b2b_no_site_brus__: {
     subject: "Um site para a {{empresa}}",
-    body: "{Olá!|Bom dia!|Boa tarde!} Meu nome é Bruno, sou da DevzDesign (www.devzdesign.com.br). Fazemos sites institucionais para empresas que vendem para outras empresas.\n\nNotei que a {{empresa}} ainda não tem site. Hoje, quem procura {{categoria}} em {{cidade}} costuma pesquisar o fornecedor no Google antes de pedir orçamento, e um site que passe credibilidade e facilite o pedido de cotação pesa nessa decisão.\n\nPosso montar uma prévia do site da {{empresa}}, com serviços, portfólio e formulário de orçamento? É sem custo, você avalia e decide. {É só me responder por aqui.|Se tiver interesse, é só responder por aqui.}",
+    body: "{Olá!|{{saudacao}}!|Olá, tudo bem?} Meu nome é Bruno, sou da DevzDesign (www.devzdesign.com.br). Fazemos sites institucionais para empresas que vendem para outras empresas.\n\nNotei que a {{empresa}} ainda não tem site. Hoje, quem procura {{categoria}} em {{cidade}} costuma pesquisar o fornecedor no Google antes de pedir orçamento, e um site que passe credibilidade e facilite o pedido de cotação pesa nessa decisão.\n\nPosso montar uma prévia do site da {{empresa}}, com serviços, portfólio e formulário de orçamento? É sem custo, você avalia e decide. {É só me responder por aqui.|Se tiver interesse, é só responder por aqui.}",
   },
   __b2b_pt__: {
     subject: "Site institucional da {{empresa}}",
-    body: "{Olá!|Bom dia!|Boa tarde!} Chamo-me Bruno e sou da DevzDesign (www.devzdesign.com.br). Desenvolvemos sites institucionais para empresas que vendem a outras empresas.\n\nEstive a ver a presença online da {{empresa}} e {{problema}}. Hoje, quem procura {{categoria}} em {{cidade}} costuma pesquisar o fornecedor no Google antes de pedir orçamento, e um site que transmita credibilidade e facilite o pedido de orçamento pesa nessa decisão.\n\nPosso enviar-lhe uma prévia de como ficaria o site da {{empresa}}, com serviços, portefólio e formulário de pedido de orçamento? É gratuito, avalia e decide.\n\n{Cumprimentos|Com os melhores cumprimentos},\nBruno Bragaia\nDevzDesign",
+    body: "{Olá!|Olá, tudo bem?|Olá, como vai?} Chamo-me Bruno e sou da DevzDesign (www.devzdesign.com.br). Desenvolvemos sites institucionais para empresas que vendem a outras empresas.\n\nEstive a ver a presença online da {{empresa}} e {{problema}}. Hoje, quem procura {{categoria}} em {{cidade}} costuma pesquisar o fornecedor no Google antes de pedir orçamento, e um site que transmita credibilidade e facilite o pedido de orçamento pesa nessa decisão.\n\nPosso enviar-lhe uma prévia de como ficaria o site da {{empresa}}, com serviços, portefólio e formulário de pedido de orçamento? É gratuito, avalia e decide.\n\n{Cumprimentos|Com os melhores cumprimentos},\nBruno Bragaia\nDevzDesign",
   },
   __b2b_no_site_pt__: {
     subject: "Um site para a {{empresa}}",
-    body: "{Olá!|Bom dia!|Boa tarde!} Chamo-me Bruno e sou da DevzDesign (www.devzdesign.com.br). Desenvolvemos sites institucionais para empresas que vendem a outras empresas.\n\nReparei que a {{empresa}} ainda não tem site. Hoje, quem procura {{categoria}} em {{cidade}} costuma pesquisar o fornecedor no Google antes de pedir orçamento, e um site que transmita credibilidade e facilite o pedido de orçamento pesa nessa decisão.\n\nPosso preparar uma prévia do site da {{empresa}}, com serviços, portefólio e formulário de pedido de orçamento? É gratuito, avalia e decide. Basta responder por aqui.",
+    body: "{Olá!|Olá, tudo bem?|Olá, como vai?} Chamo-me Bruno e sou da DevzDesign (www.devzdesign.com.br). Desenvolvemos sites institucionais para empresas que vendem a outras empresas.\n\nReparei que a {{empresa}} ainda não tem site. Hoje, quem procura {{categoria}} em {{cidade}} costuma pesquisar o fornecedor no Google antes de pedir orçamento, e um site que transmita credibilidade e facilite o pedido de orçamento pesa nessa decisão.\n\nPosso preparar uma prévia do site da {{empresa}}, com serviços, portefólio e formulário de pedido de orçamento? É gratuito, avalia e decide. Basta responder por aqui.",
   },
   __b2b_us__: {
     subject: "{{empresa}}'s website",
@@ -438,6 +438,17 @@ function hashString(text: string): number {
   return h >>> 0;
 }
 
+// Bom dia/Boa tarde/Boa noite pelo horario de Brasilia (quem envia). Usado via
+// {{saudacao}} dentro de uma variacao, ex: {Olá!|{{saudacao}}!}.
+function saudacao(now = new Date()): string {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(now)
+  );
+  if (hour < 12) return "Bom dia";
+  if (hour < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 export function renderTemplate(template: MessageTemplate, lead: TemplateLeadData): MessageTemplate {
   const vars: Record<string, string> = {
     empresa: cleanBusinessName(lead.name),
@@ -454,6 +465,7 @@ export function renderTemplate(template: MessageTemplate, lead: TemplateLeadData
 
   function render(text: string): string {
     return text
+      .replace(/\{\{saudacao\}\}/g, saudacao())
       .replace(/\{([^{}|]*(?:\|[^{}|]*)+)\}/g, (_, options: string) => {
         const list = options.split("|");
         return list[hashString(`${seed}#${group++}`) % list.length];
