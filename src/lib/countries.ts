@@ -28,12 +28,11 @@ export interface CountryConfig {
   // DDI 55 do Brasil).
   minPhoneDigits: number;
   maxLocalDigits: number;
-  // Fila de WhatsApp so aceita numero com cara de celular de verdade. No
-  // Brasil fica false: muita empresa registra o WhatsApp Business num
-  // numero de formato fixo (VoIP/PABX virtual), entao filtrar por "parece
-  // celular" perderia leads bons. Em Portugal e Reino Unido a maioria dos
-  // telefones do Google Maps e fixo mesmo (sem WhatsApp nenhum) - sem esse
-  // filtro a fila ficava cheia de numero que nunca abre.
+  // Fila de WhatsApp so aceita numero com cara de celular de verdade. Em
+  // BR, PT e UK boa parte dos telefones do Google Maps e fixo (sem WhatsApp
+  // nenhum) - sem esse filtro a fila ficava cheia de numero que nunca abre.
+  // Perde um ou outro WhatsApp Business em numero de formato fixo (VoIP/PABX
+  // virtual), mas na pratica a maioria dos fixos nao tinha WhatsApp.
   whatsappMobileOnly: boolean;
   // Chaves em message_templates.category dos textos especiais do pais.
   templateKeys: {
@@ -56,7 +55,7 @@ export const COUNTRIES: Record<Country, CountryConfig> = {
     stripTrunkZero: false,
     minPhoneDigits: 10,
     maxLocalDigits: 11,
-    whatsappMobileOnly: false,
+    whatsappMobileOnly: true,
     templateKeys: { default: null, noSite: "__whatsapp_no_site__", followUp: "__followup__" },
   },
   US: {
