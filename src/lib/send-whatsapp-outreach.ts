@@ -6,6 +6,7 @@ import { startOfTodayBrasiliaISO } from "./timezone";
 import { buildProblemSummary, type SiteAnalysisSummary } from "./template";
 import { fetchBlockedPhones } from "./blocklist";
 import { normalizePhone } from "./deduplication";
+import { isWhatsappSendingPaused } from "./app-settings";
 
 // "com_site_v2" acrescenta uma 3a variavel ({{3}}) com o achado real da
 // analise do site (mesmo padrao ja usado no email) - "com_site_v1" so tem
@@ -90,6 +91,13 @@ async function countTemplatesSentToday(): Promise<number> {
 // Espelha a estrutura de sendPendingOutreach em send-outreach.ts, mas pro
 // canal WhatsApp em vez de email.
 export async function sendPendingWhatsappTemplates(limit = 20, deadline = Infinity) {
+  // Pausa manual (app_settings) - liga quando a entrega esta quebrada do
+  // lado da Meta (ex: forma de pagamento invalida na conta) pra nao ficar
+  // queimando a cota diaria mandando mensagem que nunca chega em ninguem.
+  if (await isWhatsappSendingPaused()) {
+    return { sent: 0, failed: 0, total: 0, daily_limit_reached: false, sent_today: 0, daily_limit: 0, paused: true };
+  }
+
   const dailyLimit = Number(process.env.WHATSAPP_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
   const alreadySentToday = await countTemplatesSentToday();
   const remainingToday = Math.max(0, dailyLimit - alreadySentToday);
@@ -222,6 +230,10 @@ export async function sendPendingWhatsappTemplates(limit = 20, deadline = Infini
 // nada (last_inbound_at continua null) - reabre a janela de 24h com outro
 // template pago, ja que texto livre so funciona depois que o lead responde.
 export async function sendPendingWhatsappFollowUps(daysThreshold = 5, limit = 20, deadline = Infinity) {
+  if (await isWhatsappSendingPaused()) {
+    return { sent: 0, failed: 0, total: 0, paused: true };
+  }
+
   const dailyLimit = Number(process.env.WHATSAPP_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
   const alreadySentToday = await countTemplatesSentToday();
   const remainingToday = Math.max(0, dailyLimit - alreadySentToday);

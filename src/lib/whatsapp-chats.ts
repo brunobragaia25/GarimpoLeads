@@ -214,7 +214,8 @@ const STATUS_RANK: Record<string, number> = { sent: 1, delivered: 2, read: 3, fa
 
 export async function updateMessageDeliveryStatus(
   waMessageId: string,
-  status: string
+  status: string,
+  errorDetail?: string | null
 ): Promise<void> {
   const { data: existing } = await supabase
     .from("whatsapp_messages")
@@ -230,7 +231,10 @@ export async function updateMessageDeliveryStatus(
 
   const { error } = await supabase
     .from("whatsapp_messages")
-    .update({ delivery_status: status })
+    // So sobrescreve delivery_error quando vier um novo (mensagem de status
+    // "sent"/"delivered" depois de um "failed" nao deveria acontecer, mas
+    // por seguranca nao apaga o motivo do erro anterior sem necessidade).
+    .update({ delivery_status: status, ...(errorDetail ? { delivery_error: errorDetail } : {}) })
     .eq("id", existing.id);
   if (error) throw new Error(error.message);
 }

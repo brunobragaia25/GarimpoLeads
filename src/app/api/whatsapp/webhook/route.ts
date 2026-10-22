@@ -40,6 +40,7 @@ interface WhatsappWebhookPayload {
         statuses?: Array<{
           id: string;
           status: string;
+          errors?: Array<{ code: number; title: string; message?: string; error_data?: { details?: string } }>;
         }>;
       };
     }>;
@@ -345,7 +346,14 @@ export async function POST(req: NextRequest) {
 
       for (const statusUpdate of change.value?.statuses ?? []) {
         try {
-          await updateMessageDeliveryStatus(statusUpdate.id, statusUpdate.status);
+          // A Meta so manda "errors" em status "failed" - guarda o motivo
+          // real (codigo + titulo) em vez de so a palavra "failed", senao
+          // uma falha em massa fica impossivel de diagnosticar depois.
+          const firstError = statusUpdate.errors?.[0];
+          const errorDetail = firstError
+            ? `[${firstError.code}] ${firstError.title}${firstError.error_data?.details ? ` - ${firstError.error_data.details}` : ""}`
+            : null;
+          await updateMessageDeliveryStatus(statusUpdate.id, statusUpdate.status, errorDetail);
         } catch (err) {
           console.error("Erro atualizando status de entrega do WhatsApp:", err);
         }

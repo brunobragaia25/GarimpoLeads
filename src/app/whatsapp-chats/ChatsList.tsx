@@ -18,6 +18,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { DeleteConversationButton } from "./DeleteConversationButton";
+import { Avatar } from "./Avatar";
 import type { WhatsappConversationSummary } from "@/lib/whatsapp-chats";
 
 function formatDateTime(iso: string | null): string {
@@ -300,6 +301,8 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
                   <Square className="h-4 w-4" />
                 )}
               </button>
+
+              <Avatar name={c.leadName} size="sm" />
 
               <span className="flex shrink-0 items-center gap-1">
                 {c.hasUnread && (

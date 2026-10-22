@@ -9,13 +9,19 @@ import {
   Check,
   CheckCheck,
   CheckSquare,
+  ExternalLink,
+  Globe,
   Loader2,
+  MapPin,
+  Phone,
   Send,
   Square,
+  Tag,
   Trash2,
   X,
 } from "lucide-react";
 import type { WhatsappConversationDetail } from "@/lib/whatsapp-chats";
+import { Avatar } from "../Avatar";
 
 // Tiques ao estilo WhatsApp: 1 cinza = enviado, 2 cinza = entregue,
 // 2 azul = lido. Sem status ainda (null) nao mostra nada, evita
@@ -81,6 +87,28 @@ function formatTime(iso: string): string {
   }).format(new Date(iso));
 }
 
+// Chave de dia no fuso de Brasilia, pra saber quando inserir um separador
+// ("Hoje", "Ontem", ou a data) entre mensagens de dias diferentes.
+function dayKey(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(iso));
+}
+
+function formatDaySeparator(iso: string): string {
+  const todayKey = dayKey(new Date().toISOString());
+  const yesterdayKey = dayKey(new Date(Date.now() - 86_400_000).toISOString());
+  const key = dayKey(iso);
+
+  if (key === todayKey) return "Hoje";
+  if (key === yesterdayKey) return "Ontem";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(iso));
+}
+
 export function ChatView({ conversation }: { conversation: WhatsappConversationDetail }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -94,6 +122,7 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
   const [linkPreview, setLinkPreview] = useState<LinkPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [dismissedPreviewUrl, setDismissedPreviewUrl] = useState<string | null>(null);
+  const [showInfoPanel, setShowInfoPanel] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -249,15 +278,21 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
         >
           <ArrowLeft className="h-4 w-4" />
         </a>
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-zinc-900 dark:text-zinc-50">
-            {conversation.leadName}
-          </p>
-          <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-            {conversation.leadCategory}
-            {conversation.leadAddress ? ` · ${conversation.leadAddress}` : ""}
-          </p>
-        </div>
+        <button
+          onClick={() => setShowInfoPanel(true)}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left hover:opacity-80"
+        >
+          <Avatar name={conversation.leadName} size="sm" />
+          <div className="min-w-0">
+            <p className="truncate font-medium text-zinc-900 dark:text-zinc-50">
+              {conversation.leadName}
+            </p>
+            <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+              {conversation.leadCategory}
+              {conversation.leadAddress ? ` · ${conversation.leadAddress}` : ""}
+            </p>
+          </div>
+        </button>
         <button
           onClick={handleToggleAi}
           disabled={togglingAi}
@@ -330,9 +365,20 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
             Nenhuma mensagem trocada ainda.
           </p>
         )}
-        {conversation.messages.map((m) => (
+        {conversation.messages.map((m, i) => {
+          const previous = conversation.messages[i - 1];
+          const showDaySeparator = !previous || dayKey(previous.createdAt) !== dayKey(m.createdAt);
+
+          return (
+          <div key={m.id}>
+          {showDaySeparator && (
+            <div className="my-3 flex items-center justify-center">
+              <span className="rounded-full bg-zinc-100 px-3 py-1 text-[11px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                {formatDaySeparator(m.createdAt)}
+              </span>
+            </div>
+          )}
           <div
-            key={m.id}
             className={`flex items-center gap-1.5 ${
               m.direction === "outbound" ? "justify-end" : "justify-start"
             }`}
@@ -409,7 +455,9 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
               </>
             )}
           </div>
-        ))}
+          </div>
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 
@@ -488,6 +536,93 @@ export function ChatView({ conversation }: { conversation: WhatsappConversationD
           </button>
         </div>
       </div>
+
+      {showInfoPanel && (
+        <div className="fixed inset-0 z-20 flex justify-end bg-black/30" onClick={() => setShowInfoPanel(false)}>
+          <div
+            className="flex h-full w-full max-w-xs flex-col overflow-y-auto bg-white p-5 shadow-xl dark:bg-zinc-950"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                Informações do contato
+              </h2>
+              <button
+                onClick={() => setShowInfoPanel(false)}
+                className="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 flex flex-col items-center gap-3">
+              <Avatar name={conversation.leadName} />
+              <p className="text-center text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                {conversation.leadName}
+              </p>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <Phone className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+                <div>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Telefone</p>
+                  <p className="text-sm text-zinc-900 dark:text-zinc-50">{conversation.phone}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Tag className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+                <div>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Categoria</p>
+                  <p className="text-sm text-zinc-900 dark:text-zinc-50">{conversation.leadCategory}</p>
+                </div>
+              </div>
+
+              {conversation.leadAddress && (
+                <div className="flex items-start gap-3">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+                  <div>
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Endereço</p>
+                    <p className="text-sm text-zinc-900 dark:text-zinc-50">{conversation.leadAddress}</p>
+                  </div>
+                </div>
+              )}
+
+              {conversation.leadWebsite && (
+                <div className="flex items-start gap-3">
+                  <Globe className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+                  <div className="min-w-0">
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Site</p>
+                    <a
+                      href={conversation.leadWebsite}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 truncate text-sm text-emerald-600 hover:underline dark:text-emerald-400"
+                    >
+                      {conversation.leadWebsite}
+                      <ExternalLink className="h-3 w-3 shrink-0" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {conversation.leadGoogleMapsUrl && (
+                <a
+                  href={conversation.leadGoogleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                >
+                  <MapPin className="h-3.5 w-3.5" />
+                  Ver no Google Maps
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
