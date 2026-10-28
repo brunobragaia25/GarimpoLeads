@@ -66,7 +66,7 @@ export function composeFooter(country: Country, unsubscribeLink: string): string
   return `---\n${senderLine()}\n${t.why} ${t.unsubscribe} ${unsubscribeLink}`;
 }
 
-const TECHNICAL_TEXT = /Request failed|ENOTFOUND|ECONNREFUSED|ECONNRESET|getaddrinfo|status code|\bundefined\b|\bnull\b|\[object|NaN/i;
+const TECHNICAL_TEXT = /Request failed|ENOTFOUND|ECONNREFUSED|ECONNRESET|getaddrinfo|status code|\bundefined\b|\bnull\b|\[object|\bNaN\b/i;
 const ENGLISH_WORDS = /\b(the|and|your|with|website's|we've|please)\b/i;
 // \b do JS nao entende letra acentuada ("você" nunca casava) - usa limite Unicode.
 const BR_ONLY_WORDS = /(?<![\p{L}])(você|vocês|pra|tá|celular)(?![\p{L}])/iu;

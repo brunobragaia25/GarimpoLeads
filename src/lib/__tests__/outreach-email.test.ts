@@ -18,6 +18,12 @@ describe("checagem de qualidade do e-mail", () => {
 
   it("barra texto tecnico de erro", () => {
     expect(checkEmailQuality("o site (Request failed with status code 403)", "US", "X").blocking).toHaveLength(1);
+    expect(checkEmailQuality("score NaN/100", "US", "X").blocking).toHaveLength(1);
+  });
+
+  it("nao confunde NaN com pedaco de palavra", () => {
+    expect(checkEmailQuality("financial advisers and maintenance services", "US", "X").blocking).toHaveLength(0);
+    expect(checkEmailQuality("quem procura gráficas em Ananindeua", "BR", "X").blocking).toHaveLength(0);
   });
 
   it("barra portugues no meio de e-mail em ingles, mas ignora o nome do negocio", () => {
