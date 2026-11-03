@@ -46,6 +46,21 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
   const [filter, setFilter] = useState<"all" | "favorites" | "replied" | "unread" | "human" | "archived">("all");
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [stateFilter, setStateFilter] = useState("");
+  const [cityFilter, setCityFilter] = useState("");
+
+  // Opcoes saem das proprias conversas (cidade/estado extraidos do endereco
+  // do lead). Com um estado escolhido, a lista de cidades fica so com as
+  // daquele estado.
+  const stateOptions = Array.from(new Set(conversations.map((c) => c.leadState).filter(Boolean))).sort();
+  const cityOptions = Array.from(
+    new Set(
+      conversations
+        .filter((c) => !stateFilter || c.leadState === stateFilter)
+        .map((c) => c.leadCity)
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, "pt-BR"));
 
   // "Arquivadas" e uma gaveta separada - some das outras abas, so aparece
   // aqui. As demais abas (Todas/Favoritas/Respondidas/Nao lidas) nunca
@@ -63,9 +78,10 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
             return true;
           });
 
-  const visibleConversations = search.trim()
-    ? filteredByTab.filter((c) => c.leadName.toLowerCase().includes(search.trim().toLowerCase()))
-    : filteredByTab;
+  const visibleConversations = filteredByTab
+    .filter((c) => !stateFilter || c.leadState === stateFilter)
+    .filter((c) => !cityFilter || c.leadCity === cityFilter)
+    .filter((c) => !search.trim() || c.leadName.toLowerCase().includes(search.trim().toLowerCase()));
 
   async function handleToggleArchive(e: React.MouseEvent, c: WhatsappConversationSummary) {
     e.preventDefault();
@@ -233,6 +249,37 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
             className="w-full rounded-md border border-zinc-200 bg-zinc-50 py-1.5 pl-8 pr-2 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
           />
         </div>
+        {(stateOptions.length > 0 || cityOptions.length > 0) && (
+          <div className="mt-2 flex gap-2">
+            <select
+              value={stateFilter}
+              onChange={(e) => {
+                setStateFilter(e.target.value);
+                setCityFilter("");
+              }}
+              className="w-24 shrink-0 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+            >
+              <option value="">Estado</option>
+              {stateOptions.map((uf) => (
+                <option key={uf} value={uf}>
+                  {uf}
+                </option>
+              ))}
+            </select>
+            <select
+              value={cityFilter}
+              onChange={(e) => setCityFilter(e.target.value)}
+              className="min-w-0 flex-1 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+            >
+              <option value="">Todas as cidades</option>
+              {cityOptions.map((city) => (
+                <option key={city} value={city}>
+                  {city}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950">
@@ -263,7 +310,7 @@ export function ChatsList({ conversations }: { conversations: WhatsappConversati
 
       {visibleConversations.length === 0 ? (
         <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          {search.trim()
+          {search.trim() || stateFilter || cityFilter
             ? "Nenhuma conversa encontrada."
             : filter === "favorites"
               ? "Nenhuma conversa favoritada ainda."

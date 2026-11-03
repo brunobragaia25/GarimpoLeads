@@ -239,6 +239,17 @@ export function extractCity(address: string | null): string {
   return "";
 }
 
+// Sigla do estado (BR "Cidade - UF," / EUA "City, ST 12345"). Portugal e
+// Reino Unido nao tem sigla no endereco do Google - volta vazio.
+export function extractState(address: string | null): string {
+  if (!address) return "";
+  const brMatch = address.match(/,\s*[^,]+?\s*-\s*([A-Z]{2}),/);
+  if (brMatch) return brMatch[1];
+  const usMatch = address.match(/,\s*[^,]+?,\s*([A-Z]{2})\s+\d{5}/);
+  if (usMatch) return usMatch[1];
+  return "";
+}
+
 export interface SiteAnalysisSummary {
   performance_score: number | null;
   is_slow: boolean | null;

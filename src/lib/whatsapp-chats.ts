@@ -1,10 +1,13 @@
 import { cache } from "react";
 import { supabase } from "./supabase";
+import { extractCity, extractState } from "./template";
 
 export interface WhatsappConversationSummary {
   id: string;
   leadName: string;
   leadCategory: string;
+  leadCity: string;
+  leadState: string;
   phone: string;
   status: string;
   aiEnabled: boolean;
@@ -50,7 +53,7 @@ export const getWhatsappConversations = cache(async (): Promise<WhatsappConversa
   const { data: conversations, error } = await supabase
     .from("whatsapp_conversations")
     .select(
-      "id, phone, status, ai_enabled, lead_id, last_inbound_at, last_read_at, pinned_at, favorited_at, needs_handoff, handoff_reason, human_confirmed_at, archived_at, created_at, leads(name, category)"
+      "id, phone, status, ai_enabled, lead_id, last_inbound_at, last_read_at, pinned_at, favorited_at, needs_handoff, handoff_reason, human_confirmed_at, archived_at, created_at, leads(name, category, address)"
     )
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
@@ -85,6 +88,8 @@ export const getWhatsappConversations = cache(async (): Promise<WhatsappConversa
       id: c.id,
       leadName: lead?.name ?? "Lead removido",
       leadCategory: lead?.category ?? "",
+      leadCity: extractCity(lead?.address ?? null),
+      leadState: extractState(lead?.address ?? null),
       phone: c.phone,
       status: c.status,
       aiEnabled: c.ai_enabled,
