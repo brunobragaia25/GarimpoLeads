@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../supabase", () => ({ supabase: {} }));
 
-import { buildProblemSummaryForLocale, extractCity, extractState } from "../template";
+import { buildProblemSummaryForLocale, extractCity, extractNeighborhood, extractState } from "../template";
 
 const okSite = { performance_score: 95, is_slow: false, is_outdated: false, is_wordpress: false, notes: "Carregou em 300ms" };
 
@@ -85,5 +85,16 @@ describe("extractState", () => {
     ["10 High St, Manchester M1 1AA, UK", ""],
   ])("%s -> %s", (address, state) => {
     expect(extractState(address)).toBe(state);
+  });
+});
+
+describe("extractNeighborhood", () => {
+  it.each([
+    ["Rua X, 100 - Centro, Curitiba - PR, 80010-000, Brasil", "Centro"],
+    ["Av. Paulista, 1000 - Sala 5 - Bela Vista, São Paulo - SP, 01310-100, Brasil", "Bela Vista"],
+    ["Rua X, 100, Curitiba - PR, 80010-000, Brasil", ""],
+    ["55 NE 5th St, Miami, FL 33132, USA", ""],
+  ])("%s -> %s", (address, neighborhood) => {
+    expect(extractNeighborhood(address)).toBe(neighborhood);
   });
 });

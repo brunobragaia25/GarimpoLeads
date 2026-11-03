@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache";
 import { supabase } from "./supabase";
 import type { SocialPlatform } from "./social-link";
 import { COUNTRY_CODES, isCountry, parseCountry, type Country } from "./countries";
+import { extractCity, extractNeighborhood, extractState } from "./template";
 
 export function toBrasiliaDateStr(iso: string | null): string | null {
   if (!iso) return null;
@@ -69,6 +70,11 @@ export type LeadSortField = "created_at" | "score" | "name" | "category" | "perf
 export interface LeadQuery {
   country: Country;
   category?: string;
+  // Sigla do estado e nome da cidade, como extractState/extractCity tiram
+  // do endereco. Cidade usa o estado junto pra nao confundir com rua.
+  state?: string;
+  city?: string;
+  neighborhood?: string;
   status?: EmailFilter;
   search?: string;
   priorityOnly?: boolean;
@@ -95,10 +101,37 @@ const SORT_COLUMN: Record<LeadSortField, string> = {
   phone: "is_mobile",
 };
 
+// Escapa os curingas do ILIKE e as aspas do filtro or() do PostgREST, pra
+// cidade/estado vindos da URL baterem literalmente.
+function ilikeLiteral(value: string): string {
+  return value.replace(/[\\%_"]/g, (c) => `\\${c}`);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyLeadQuery(query: any, q: LeadQuery) {
   query = query.eq("country", q.country);
   if (q.category) query = query.eq("category", q.category);
+  if (q.state) {
+    const uf = ilikeLiteral(q.state);
+    // BR "Cidade - UF, CEP" / EUA "City, ST 12345".
+    query = query.or(`address.ilike."%- ${uf},%",address.ilike."%, ${uf} %"`);
+  }
+  if (q.city) {
+    const city = ilikeLiteral(q.city);
+    query = q.state
+      ? query.or(
+          `address.ilike."%, ${city} - ${ilikeLiteral(q.state)},%",address.ilike."%, ${city}, ${ilikeLiteral(q.state)} %"`
+        )
+      : // Portugal "1100-053 Lisboa, Portugal" / Reino Unido "Manchester M1 1AA".
+        query.or(`address.ilike."% ${city},%",address.ilike."%, ${city} %"`);
+  }
+  // Bairro so existe no formato BR e so vale junto com cidade+estado.
+  if (q.neighborhood && q.city && q.state) {
+    query = query.ilike(
+      "address",
+      `%- ${ilikeLiteral(q.neighborhood)}, ${ilikeLiteral(q.city)} - ${ilikeLiteral(q.state)},%`
+    );
+  }
 
   switch (q.status ?? "all") {
     case "all":
@@ -297,6 +330,46 @@ export const getLeadStats = unstable_cache(fetchLeadStats, ["lead-stats"], {
   revalidate: STATS_CACHE_SECONDS,
 });
 
+export interface LeadLocation {
+  state: string;
+  city: string;
+  neighborhood: string;
+}
+
+// Cidades/estados distintos dos enderecos dos leads do pais - opcoes dos
+// filtros de local das filas.
+async function fetchLeadLocations(country: Country): Promise<LeadLocation[]> {
+  const seen = new Map<string, LeadLocation>();
+  for (let offset = 0; ; offset += POSTGREST_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("leads")
+      .select("address")
+      .eq("country", country)
+      .not("address", "is", null)
+      .order("id", { ascending: true })
+      .range(offset, offset + POSTGREST_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      const city = extractCity(row.address);
+      if (!city) continue;
+      const state = extractState(row.address);
+      const neighborhood = extractNeighborhood(row.address);
+      seen.set(`${state}|${city}|${neighborhood}`, { state, city, neighborhood });
+    }
+    if (!data || data.length < POSTGREST_PAGE_SIZE) break;
+  }
+  return [...seen.values()].sort(
+    (a, b) =>
+      a.state.localeCompare(b.state) ||
+      a.city.localeCompare(b.city, "pt-BR") ||
+      a.neighborhood.localeCompare(b.neighborhood, "pt-BR")
+  );
+}
+
 export const getLeadCategories = unstable_cache(fetchLeadCategories, ["lead-categories"], {
+  revalidate: STATS_CACHE_SECONDS,
+});
+
+export const getLeadLocations = unstable_cache(fetchLeadLocations, ["lead-locations"], {
   revalidate: STATS_CACHE_SECONDS,
 });

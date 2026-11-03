@@ -261,6 +261,17 @@ export function extractState(address: string | null): string {
   return "";
 }
 
+// Bairro so no formato BR: "Rua X, 100 - Centro, Curitiba - PR, CEP" - e o
+// ultimo trecho depois de " - " antes de ", Cidade - UF". Sem isso (ex:
+// "Rua X, 100, Curitiba - PR") volta vazio.
+export function extractNeighborhood(address: string | null): string {
+  if (!address) return "";
+  const match = address.match(/(?:^|,)([^,]*),\s*[^,]+?\s*-\s*[A-Z]{2},/);
+  if (!match) return "";
+  const parts = match[1].split(/\s-\s/);
+  return parts.length > 1 ? parts[parts.length - 1].trim() : "";
+}
+
 export interface SiteAnalysisSummary {
   performance_score: number | null;
   is_slow: boolean | null;

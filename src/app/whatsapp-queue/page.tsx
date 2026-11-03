@@ -1,4 +1,4 @@
-import { countLeads, getLeadCategories, queryLeads, type LeadQuery } from "@/lib/leads";
+import { countLeads, getLeadCategories, getLeadLocations, queryLeads, type LeadQuery } from "@/lib/leads";
 import {
   buildProblemSummaryFor,
   categoryTemplateKey,
@@ -10,7 +10,7 @@ import { whatsappLink } from "@/lib/phone";
 import { COUNTRIES } from "@/lib/countries";
 import { PageHeader } from "../PageHeader";
 import { QueueClient, type QueueLead } from "./QueueClient";
-import { QueueFilters, type SiteFilter } from "../QueueFilters";
+import { QueueFilters, type LocationFilter, type SiteFilter } from "../QueueFilters";
 import { MessageCircle } from "lucide-react";
 import { getSelectedCountry } from "@/lib/country-server";
 
@@ -28,6 +28,11 @@ export default async function WhatsappQueuePage({
     params.site === "with" || params.site === "without" ? params.site : "all";
   const categoryFilter = params.category ?? "all";
   const starredFilter = params.starred === "1";
+  const locationFilter: LocationFilter = {
+    state: params.state ?? "",
+    city: params.city ?? "",
+    neighborhood: params.neighborhood ?? "",
+  };
   const countryFilter = await getSelectedCountry();
 
   // Fica de fora da fila quem só tem link de rede social (Instagram,
@@ -41,6 +46,9 @@ export default async function WhatsappQueuePage({
   const queueQuery: LeadQuery = {
     country: countryFilter,
     category: categoryFilter === "all" ? undefined : categoryFilter,
+    state: locationFilter.state || undefined,
+    city: locationFilter.city || undefined,
+    neighborhood: locationFilter.neighborhood || undefined,
     status: "not_contacted",
     site: siteFilter === "all" ? "" : siteFilter,
     hasEmail: false,
@@ -54,8 +62,9 @@ export default async function WhatsappQueuePage({
 
   // So um lote vai pro navegador (montar a mensagem de todos os elegiveis
   // gerava ~4MB de HTML); recarregar a pagina traz o proximo.
-  const [categories, totalPending, pending, starredCount] = await Promise.all([
+  const [categories, locations, totalPending, pending, starredCount] = await Promise.all([
     getLeadCategories(countryFilter),
+    getLeadLocations(countryFilter),
     countLeads(queueQuery),
     queryLeads(queueQuery, 0, QUEUE_BATCH_SIZE),
     countLeads({ ...queueQuery, starredOnly: true, excludeStarred: false }),
@@ -145,13 +154,15 @@ export default async function WhatsappQueuePage({
             categories={categories}
             starred={starredFilter}
             starredCount={starredCount}
+            location={locationFilter}
+            locations={locations}
           />
         </div>
 
         <QueueClient
           leads={queue}
           total={totalPending}
-          key={`${countryFilter}:${siteFilter}:${categoryFilter}:${starredFilter}`}
+          key={`${countryFilter}:${siteFilter}:${categoryFilter}:${starredFilter}:${locationFilter.state}:${locationFilter.city}:${locationFilter.neighborhood}`}
         />
       </main>
     </div>
