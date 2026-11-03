@@ -17,7 +17,15 @@ const FIELD_MASK = [
   "places.nationalPhoneNumber",
   "places.websiteUri",
   "places.googleMapsUri",
+  "nextPageToken",
 ].join(",");
+
+// O Text Search devolve no maximo 20 por pagina e 3 paginas (60 no total).
+// Com so a primeira pagina, cidades grandes ficavam com a maior parte dos
+// negocios de fora.
+const MAX_PAGES = 3;
+// Pequena pausa antes de pedir a proxima pagina, pro token ja estar valido.
+const PAGE_DELAY_MS = 1_500;
 
 interface PlaceResult {
   displayName?: { text: string };
@@ -27,11 +35,15 @@ interface PlaceResult {
   googleMapsUri?: string;
 }
 
-async function textSearch(query: string, language: string): Promise<PlaceResult[]> {
+async function textSearch(
+  query: string,
+  language: string,
+  pageToken?: string
+): Promise<{ places: PlaceResult[]; nextPageToken?: string }> {
   try {
     const { data } = await axios.post(
       PLACES_SEARCH_URL,
-      { textQuery: query, languageCode: language },
+      { textQuery: query, languageCode: language, ...(pageToken ? { pageToken } : {}) },
       {
         headers: {
           "X-Goog-Api-Key": process.env.GOOGLE_MAPS_API_KEY,
@@ -40,7 +52,7 @@ async function textSearch(query: string, language: string): Promise<PlaceResult[
         timeout: REQUEST_TIMEOUT_MS,
       }
     );
-    return data.places ?? [];
+    return { places: data.places ?? [], nextPageToken: data.nextPageToken };
   } catch (err) {
     const apiError = axios.isAxiosError(err) ? err.response?.data?.error : undefined;
     if (apiError) {
@@ -53,7 +65,15 @@ async function textSearch(query: string, language: string): Promise<PlaceResult[
 export async function searchLeads(category: string, location: string, country: Country = "BR"): Promise<Lead[]> {
   const { placesLanguage: language, searchJoin } = COUNTRIES[country];
   const query = `${category} ${searchJoin} ${location}`;
-  const results = await textSearch(query, language);
+  const results: PlaceResult[] = [];
+  let pageToken: string | undefined;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    if (page > 0) await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
+    const { places, nextPageToken } = await textSearch(query, language, pageToken);
+    results.push(...places);
+    if (!nextPageToken) break;
+    pageToken = nextPageToken;
+  }
 
   return results.map((place) => ({
     name: place.displayName?.text ?? "",

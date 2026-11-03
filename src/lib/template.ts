@@ -25,6 +25,12 @@ const DEFAULT_TEMPLATES: Record<string, MessageTemplate> = {
     subject: "",
     body: "{Olá!|Oi!|Olá, tudo bem?} Eu me chamo Bruno e sou da DevzDesign (www.devzdesign.com.br). {Procurei|Pesquisei} a {{empresa}} no Google e {percebi|notei} que vocês ainda não têm um site.\n\n{Eu ajudo|Ajudo} empresas locais a criarem sites personalizados para aparecer melhor no Google e conquistar mais clientes. {Gostaria de mostrar|Posso te mostrar} alguns dos trabalhos que já desenvolvi? {É só me responder por aqui.|Se tiver interesse, é só responder por aqui.|Me responde por aqui se quiser ver.}",
   },
+  // Follow-up automatico do WhatsApp (so BR) - o __followup__ fala de
+  // "email anterior", nao serve pro WhatsApp.
+  __whatsapp_followup__: {
+    subject: "",
+    body: "{Oi, tudo bem?|Olá, tudo bem?|{{saudacao}}, tudo bem?} Passando só pra saber se você chegou a ver minha mensagem sobre o site da {{empresa}}. {Se fizer sentido, é só me responder por aqui.|Fico à disposição se quiser trocar uma ideia.}",
+  },
   __followup__: {
     subject: "Re: sobre o site da {{empresa}}",
     body: "Oi, tudo bem?\n\nPassando só pra saber se você chegou a ver meu email anterior sobre o site da {{empresa}}. Fico à disposição se quiser trocar uma ideia.\n\nAbraço,\nBruno",
@@ -127,6 +133,7 @@ const DEFAULT_TEMPLATES: Record<string, MessageTemplate> = {
 // Chaves antigas continuam exportadas (usadas pela tela /template).
 export const FOLLOWUP_CATEGORY = COUNTRIES.BR.templateKeys.followUp;
 export const WHATSAPP_NO_SITE_CATEGORY = COUNTRIES.BR.templateKeys.noSite;
+export const WHATSAPP_FOLLOWUP_CATEGORY = "__whatsapp_followup__";
 
 async function getStoredTemplate(key: string | null): Promise<MessageTemplate | null> {
   const query = supabase.from("message_templates").select("subject, body");
@@ -140,6 +147,10 @@ async function getSpecialTemplate(key: string | null): Promise<MessageTemplate> 
 
 export async function getFollowUpTemplate(country: Country = "BR"): Promise<MessageTemplate> {
   return getSpecialTemplate(COUNTRIES[country].templateKeys.followUp);
+}
+
+export async function getWhatsappFollowUpTemplate(): Promise<MessageTemplate> {
+  return getSpecialTemplate(WHATSAPP_FOLLOWUP_CATEGORY);
 }
 
 // Mensagem pros leads sem site (WhatsApp e fila de email).

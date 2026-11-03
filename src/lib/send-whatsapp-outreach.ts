@@ -1,19 +1,32 @@
 import { supabase } from "./supabase";
-import { sendWhatsappTemplate, toWhatsappPhone } from "./whatsapp";
+import { hasWhatsappAccount, sendWhatsappText, toWhatsappPhone } from "./whatsapp";
 import { isMobilePhone } from "./phone";
 import { detectSocialPlatform } from "./social-link";
 import { startOfTodayBrasiliaISO } from "./timezone";
-import { buildProblemSummary, type SiteAnalysisSummary } from "./template";
+import {
+  buildProblemSummary,
+  categoryTemplateKey,
+  getNoSiteTemplates,
+  getTemplate,
+  getWhatsappFollowUpTemplate,
+  renderTemplate,
+  type MessageTemplate,
+  type SiteAnalysisSummary,
+} from "./template";
 import { fetchBlockedPhones } from "./blocklist";
 import { normalizePhone } from "./deduplication";
 import { isWhatsappSendingPaused } from "./app-settings";
 
-// "com_site_v2" acrescenta uma 3a variavel ({{3}}) com o achado real da
-// analise do site (mesmo padrao ja usado no email) - "com_site_v1" so tem
-// {{1}}/{{2}} e quebraria se mandasse variavel a mais. Assim que o template
-// v2 aprovar na Meta, so trocar WHATSAPP_TEMPLATE_HAS_SITE_NAME pro nome
-// dele que o codigo ja passa a incluir a 3a variavel sozinho.
-const TEMPLATE_WITH_PROBLEM_VARIABLE = "com_site_v2";
+// Pausa aleatoria entre um envio e outro - rajada de mensagens identicas em
+// sequencia e o padrao que o anti-spam do WhatsApp mais pega num numero
+// conectado via WhatsApp Web (Evolution).
+const MIN_DELAY_MS = 8_000;
+const MAX_DELAY_MS = 20_000;
+
+function randomDelay(): Promise<void> {
+  const ms = MIN_DELAY_MS + Math.random() * (MAX_DELAY_MS - MIN_DELAY_MS);
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function fetchLatestAnalysisByLead(leadIds: string[]): Promise<Map<string, SiteAnalysisSummary>> {
   const map = new Map<string, SiteAnalysisSummary>();
@@ -65,6 +78,8 @@ interface CandidateLead {
   category: string;
   phone: string | null;
   website: string | null;
+  address: string | null;
+  has_whatsapp: boolean | null;
 }
 
 // Envio inicial e follow-up dividem a mesma cota diaria (mesmo padrao do
@@ -86,13 +101,14 @@ async function countTemplatesSentToday(): Promise<number> {
   return (initial ?? 0) + (followUps ?? 0);
 }
 
-// Dispara o template Meta aprovado (categoria "marketing", pago por envio)
-// pra leads elegiveis com WhatsApp que ainda nao tem conversa iniciada.
+// Primeira mensagem (texto livre via Evolution) pra leads elegiveis com
+// WhatsApp que ainda nao tem conversa iniciada. Mesmos textos da fila
+// manual de WhatsApp (editaveis em /template), com as variacoes {a|b}.
 // Espelha a estrutura de sendPendingOutreach em send-outreach.ts, mas pro
 // canal WhatsApp em vez de email.
 export async function sendPendingWhatsappTemplates(limit = 20, deadline = Infinity) {
-  // Pausa manual (app_settings) - liga quando a entrega esta quebrada do
-  // lado da Meta (ex: forma de pagamento invalida na conta) pra nao ficar
+  // Pausa manual (app_settings) - liga quando a entrega esta quebrada (ex:
+  // numero desconectado ou restrito pelo WhatsApp) pra nao ficar
   // queimando a cota diaria mandando mensagem que nunca chega em ninguem.
   if (await isWhatsappSendingPaused()) {
     return { sent: 0, failed: 0, total: 0, daily_limit_reached: false, sent_today: 0, daily_limit: 0, paused: true };
@@ -121,7 +137,8 @@ export async function sendPendingWhatsappTemplates(limit = 20, deadline = Infini
   for (let offset = 0; ; offset += POSTGREST_PAGE_SIZE) {
     const { data, error: leadsError } = await supabase
       .from("leads")
-      .select("id, name, category, phone, website")
+      .select("id, name, category, phone, website, address, has_whatsapp")
+      .eq("country", "BR")
       .not("phone", "is", null)
       .order("created_at", { ascending: true })
       .range(offset, offset + POSTGREST_PAGE_SIZE - 1);
@@ -141,6 +158,8 @@ export async function sendPendingWhatsappTemplates(limit = 20, deadline = Infini
   const eligible = leads
     .filter((l): l is CandidateLead => !existingLeadIds.has(l.id))
     .filter((l) => isMobilePhone(l.phone))
+    // Ja conferido antes e sem conta de WhatsApp - nao checa de novo todo dia.
+    .filter((l) => l.has_whatsapp !== false)
     .filter((l) => detectSocialPlatform(l.website) === null)
     .filter((l) => {
       const phone = normalizePhone(l.phone);
@@ -151,39 +170,57 @@ export async function sendPendingWhatsappTemplates(limit = 20, deadline = Infini
   // direto pra vender site do zero), mesmo padrao ja usado em
   // analyzePendingSites. Dentro de cada grupo mantem a ordem cronologica
   // (mais antigo primeiro).
+  // Nao corta no limite aqui: numero sem WhatsApp e pulado no loop sem
+  // contar como envio, entao a fila anda ate bater a cota.
   const noWebsite = eligible.filter((l) => !l.website);
   const withWebsite = eligible.filter((l) => !!l.website);
-  const pending = [...noWebsite, ...withWebsite].slice(0, effectiveLimit);
+  const pending = [...noWebsite, ...withWebsite];
 
-  const analysisByLead = await fetchLatestAnalysisByLead(
-    pending.filter((l) => l.website).map((l) => l.id)
-  );
+  const noSiteTemplates = await getNoSiteTemplates([...new Set(noWebsite.map((l) => l.category))], "BR");
+  const siteTemplates = new Map<string, MessageTemplate>();
 
   let sent = 0;
   let failed = 0;
+  let attempted = 0;
 
   for (const lead of pending) {
+    if (sent >= effectiveLimit) break;
     // Checa a cada mensagem, nao so antes de comecar o loop - sem isso, se
     // muitos envios demorarem (mesmo com timeout por chamada), a soma pode
     // estourar o limite de execucao da Vercel antes de terminar o lote
     // inteiro, matando a funcao sem nunca gravar o log final. O resto fica
     // pro proximo cron (agora 2x/dia).
-    if (Date.now() > deadline) break;
-
-    const hasWebsite = !!lead.website;
-    const templateName = hasWebsite
-      ? process.env.WHATSAPP_TEMPLATE_HAS_SITE_NAME!
-      : process.env.WHATSAPP_TEMPLATE_NO_SITE_NAME!;
-
-    const variables =
-      hasWebsite && templateName === TEMPLATE_WITH_PROBLEM_VARIABLE
-        ? [lead.name, lead.category, buildProblemSummary(analysisByLead.get(lead.id) ?? null)]
-        : hasWebsite
-          ? [lead.name, lead.category]
-          : [lead.name];
+    if (Date.now() + MAX_DELAY_MS > deadline) break;
+    attempted++;
 
     try {
-      const waMessageId = await sendWhatsappTemplate(lead.phone!, templateName, variables);
+      if (!(await hasWhatsappAccount(lead.phone!))) {
+        await supabase.from("leads").update({ has_whatsapp: false }).eq("id", lead.id);
+        continue;
+      }
+
+      let template = noSiteTemplates.get(lead.category);
+      let problem: string | undefined;
+      if (lead.website) {
+        template = siteTemplates.get(lead.category);
+        if (!template) {
+          template = await getTemplate(categoryTemplateKey(lead.category, "BR"), "BR");
+          siteTemplates.set(lead.category, template);
+        }
+        const analysis = (await fetchLatestAnalysisByLead([lead.id])).get(lead.id) ?? null;
+        problem = buildProblemSummary(analysis);
+      }
+      if (!template) continue;
+
+      const text = renderTemplate(template, {
+        name: lead.name,
+        category: lead.category,
+        address: lead.address,
+        problem,
+      }).body;
+
+      if (sent > 0) await randomDelay();
+      const waMessageId = await sendWhatsappText(lead.phone!, text);
       const now = new Date().toISOString();
       const { data: conversation, error: insertError } = await supabase
         .from("whatsapp_conversations")
@@ -198,20 +235,17 @@ export async function sendPendingWhatsappTemplates(limit = 20, deadline = Infini
         .single();
       if (insertError) throw new Error(insertError.message);
 
-      // Registra o envio do template no historico - o conteudo exato do
-      // template fica so no lado da Meta (aprovado la, nao renderizado
-      // aqui), entao gravamos uma nota legivel em vez do texto literal.
       await supabase.from("whatsapp_messages").insert({
         conversation_id: conversation.id,
         direction: "outbound",
-        body: `[Template "${templateName}" enviado com variáveis: ${variables.join(", ")}]`,
+        body: text,
         wa_message_id: waMessageId,
       });
 
       sent++;
     } catch {
-      // Falha no envio (numero invalido, template rejeitado, etc.) - nao
-      // grava conversa, entao o lead e retentado no proximo dia.
+      // Falha no envio (instancia desconectada, numero invalido, etc.) -
+      // nao grava conversa, entao o lead e retentado no proximo dia.
       failed++;
     }
   }
@@ -219,16 +253,15 @@ export async function sendPendingWhatsappTemplates(limit = 20, deadline = Infini
   return {
     sent,
     failed,
-    total: pending.length,
+    total: attempted,
     daily_limit_reached: false,
     sent_today: alreadySentToday + sent,
     daily_limit: dailyLimit,
   };
 }
 
-// Follow-up pra quem recebeu o template inicial ha X dias e nunca respondeu
-// nada (last_inbound_at continua null) - reabre a janela de 24h com outro
-// template pago, ja que texto livre so funciona depois que o lead responde.
+// Follow-up pra quem recebeu a mensagem inicial ha X dias e nunca respondeu
+// nada (last_inbound_at continua null).
 export async function sendPendingWhatsappFollowUps(daysThreshold = 5, limit = 20, deadline = Infinity) {
   if (await isWhatsappSendingPaused()) {
     return { sent: 0, failed: 0, total: 0, paused: true };
@@ -248,7 +281,7 @@ export async function sendPendingWhatsappFollowUps(daysThreshold = 5, limit = 20
 
   const { data: rows, error } = await supabase
     .from("whatsapp_conversations")
-    .select("id, phone, lead_id, leads(name)")
+    .select("id, phone, lead_id, leads(name, category, address)")
     .is("last_inbound_at", null)
     .is("followup_sent_at", null)
     .is("deleted_at", null)
@@ -258,18 +291,20 @@ export async function sendPendingWhatsappFollowUps(daysThreshold = 5, limit = 20
 
   if (error) throw new Error(error.message);
 
-  const templateName = process.env.WHATSAPP_TEMPLATE_FOLLOWUP_NAME!;
+  const template = await getWhatsappFollowUpTemplate();
   let sent = 0;
   let failed = 0;
 
   for (const row of rows ?? []) {
-    if (Date.now() > deadline) break;
+    if (Date.now() + MAX_DELAY_MS > deadline) break;
 
     const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads;
     if (!lead) continue;
 
     try {
-      const waMessageId = await sendWhatsappTemplate(row.phone, templateName, [lead.name]);
+      const text = renderTemplate(template, { name: lead.name, category: lead.category, address: lead.address }).body;
+      if (sent > 0) await randomDelay();
+      const waMessageId = await sendWhatsappText(row.phone, text);
       const now = new Date().toISOString();
 
       await supabase
@@ -280,7 +315,7 @@ export async function sendPendingWhatsappFollowUps(daysThreshold = 5, limit = 20
       await supabase.from("whatsapp_messages").insert({
         conversation_id: row.id,
         direction: "outbound",
-        body: `[Template "${templateName}" enviado com variáveis: ${lead.name}]`,
+        body: text,
         wa_message_id: waMessageId,
       });
 

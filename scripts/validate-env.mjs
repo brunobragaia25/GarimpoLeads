@@ -98,12 +98,13 @@ check("ANTHROPIC_API_KEY", {
   required: false,
   validate: (v) => (!v.startsWith("sk-ant-") ? "chaves da Anthropic começam com 'sk-ant-'" : null),
 });
-check("WHATSAPP_PHONE_NUMBER_ID", { required: false });
-check("WHATSAPP_ACCESS_TOKEN", { required: false });
-check("WHATSAPP_APP_SECRET", { required: false });
-check("WHATSAPP_WEBHOOK_VERIFY_TOKEN", { required: false });
-check("WHATSAPP_TEMPLATE_NO_SITE_NAME", { required: false });
-check("WHATSAPP_TEMPLATE_HAS_SITE_NAME", { required: false });
+check("EVOLUTION_API_URL", {
+  required: false,
+  validate: (v) => (!v.startsWith("https://") ? "deveria começar com https://" : null),
+});
+check("EVOLUTION_API_KEY", { required: false });
+check("EVOLUTION_INSTANCE", { required: false });
+check("EVOLUTION_WEBHOOK_TOKEN", { required: false });
 check("WHATSAPP_DAILY_LIMIT", {
   required: false,
   validate: (v) => (Number.isNaN(Number(v)) ? "deveria ser um número" : null),

@@ -1,45 +1,35 @@
-// A Meta assina o corpo do webhook com HMAC-SHA256 usando o App Secret
-// como chave, mandado no header X-Hub-Signature-256 como "sha256=<hex>".
-// https://developers.facebook.com/docs/graph-api/webhooks/getting-started#validate-payloads
-
-async function hmacHex(secret: string, body: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const signatureBytes = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
-  return Array.from(new Uint8Array(signatureBytes))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-export async function verifyWhatsappSignature(
-  signatureHeader: string | null,
-  body: string
-): Promise<boolean> {
-  const secret = process.env.WHATSAPP_APP_SECRET;
-  if (!secret || !signatureHeader) return false;
-
-  const received = signatureHeader.replace(/^sha256=/, "");
-  const expected = await hmacHex(secret, body);
-  if (received.length !== expected.length) return false;
+// A Evolution nao assina o corpo do webhook como a Meta fazia - a URL
+// cadastrada na instancia leva um token secreto (?token=...) e so aceitamos
+// evento que chegue com ele.
+export function verifyWhatsappWebhookToken(token: string | null): boolean {
+  const expected = process.env.EVOLUTION_WEBHOOK_TOKEN;
+  if (!expected || !token || token.length !== expected.length) return false;
 
   let diff = 0;
-  for (let i = 0; i < received.length; i++) {
-    diff |= received.charCodeAt(i) ^ expected.charCodeAt(i);
+  for (let i = 0; i < token.length; i++) {
+    diff |= token.charCodeAt(i) ^ expected.charCodeAt(i);
   }
   return diff === 0;
 }
 
-// Handshake de verificação que a Meta faz uma vez ao registrar a URL do
-// webhook (GET com hub.mode=subscribe, hub.verify_token, hub.challenge) -
-// só devolvemos o challenge de volta se o token bater com o nosso.
-export function verifyWhatsappWebhookChallenge(
-  mode: string | null,
-  token: string | null
-): boolean {
-  return mode === "subscribe" && token === process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+// Status de entrega da Evolution (ack do WhatsApp Web) -> os mesmos nomes
+// que a Meta usava e que ja estao gravados em whatsapp_messages.delivery_status.
+const DELIVERY_STATUS: Record<string, string> = {
+  SERVER_ACK: "sent",
+  DELIVERY_ACK: "delivered",
+  READ: "read",
+  PLAYED: "read",
+  ERROR: "failed",
+};
+
+export function toDeliveryStatus(evolutionStatus: string | undefined): string | null {
+  return (evolutionStatus && DELIVERY_STATUS[evolutionStatus]) || null;
+}
+
+// O WhatsApp passou a mandar parte dos contatos como "@lid" (id anonimo) em
+// vez do numero - a Evolution manda o numero real em remoteJidAlt/senderPn
+// nesses casos. Grupo e status ficam de fora.
+export function phoneFromJids(...jids: Array<string | undefined>): string | null {
+  const jid = jids.find((j) => j?.endsWith("@s.whatsapp.net"));
+  return jid ? jid.split("@")[0].split(":")[0] : null;
 }

@@ -24,6 +24,11 @@ create table if not exists leads (
 alter table leads add column if not exists country text not null default 'BR';
 create index if not exists idx_leads_country on leads(country);
 
+-- false = numero conferido na Evolution e sem conta de WhatsApp - o envio
+-- automatico pula esse lead em vez de conferir de novo todo dia. null =
+-- ainda nao conferido.
+alter table leads add column if not exists has_whatsapp boolean;
+
 -- Resultado da análise do site do lead
 create table if not exists site_analysis (
   id uuid primary key default uuid_generate_v4(),
@@ -98,12 +103,12 @@ create table if not exists login_attempts (
   locked_until timestamptz
 );
 
--- Conversa de WhatsApp automatizada (template Meta + resposta por IA).
+-- Conversa de WhatsApp automatizada (mensagem inicial + resposta por IA).
 -- Separado da tabela `outreach` porque ela é orientada a email (email,
 -- email_confidence, opened_at, clicked_at não fazem sentido pro WhatsApp).
--- `status` controla a janela de atendimento de 24h da Meta: template_sent/
--- open = janela ativa (pode responder com texto livre grátis), closed =
--- passou de 24h sem resposta, precisa de novo template pra reabrir.
+-- `status`: template_sent = mensagem inicial enviada, open = conversa em
+-- andamento, closed = encerrada (ex: lead recusou). Nome "template_sent"
+-- ficou da epoca da API oficial da Meta.
 create table if not exists whatsapp_conversations (
   id uuid primary key default uuid_generate_v4(),
   lead_id uuid not null references leads(id) on delete cascade,

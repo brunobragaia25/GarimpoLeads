@@ -133,11 +133,14 @@ export default function TemplatePage() {
                   </>
                 )}
                 <option value={keys.followUp}>Follow-up (acompanhamento automático)</option>
+                {country === "BR" && (
+                  <option value="__whatsapp_followup__">Follow-up do WhatsApp (acompanhamento automático)</option>
+                )}
               </>
             )}
           </select>
           <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-            {category === keys?.followUp
+            {category === keys?.followUp || category === "__whatsapp_followup__"
               ? "Enviado automaticamente pra quem foi contatado há 5+ dias e não respondeu. Se não configurar, usa um texto padrão simples."
               : category === keys?.noSite
                 ? "Mensagem pros leads sem site: vem preenchida na fila de WhatsApp e na fila de email."
@@ -150,7 +153,7 @@ export default function TemplatePage() {
             <p className="mt-6 text-sm text-zinc-500 dark:text-zinc-400">Carregando...</p>
           ) : (
             <>
-              {category !== "__whatsapp_no_site__" && (
+              {category !== "__whatsapp_no_site__" && category !== "__whatsapp_followup__" && (
                 <>
                   <label className="mt-5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                     Assunto
@@ -164,7 +167,9 @@ export default function TemplatePage() {
               )}
 
               <label className="mt-4 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                {category === "__whatsapp_no_site__" ? "Mensagem do WhatsApp" : "Corpo da mensagem"}
+                {category === "__whatsapp_no_site__" || category === "__whatsapp_followup__"
+                  ? "Mensagem do WhatsApp"
+                  : "Corpo da mensagem"}
               </label>
               <textarea
                 value={body}

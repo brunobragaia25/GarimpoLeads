@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { verifyWhatsappSignature, verifyWhatsappWebhookChallenge } from "@/lib/whatsapp-webhook";
-import { sendWhatsappText } from "@/lib/whatsapp";
+import { phoneFromJids, toDeliveryStatus, verifyWhatsappWebhookToken } from "@/lib/whatsapp-webhook";
+import { brPhoneVariants, sendWhatsappText } from "@/lib/whatsapp";
 import { generateWhatsappReply } from "@/lib/whatsapp-ai";
 import { logAiUsage } from "@/lib/ai-usage";
 import { detectNegativeIntent } from "@/lib/negative-intent";
@@ -12,39 +12,20 @@ import { notifyTelegram } from "@/lib/telegram";
 const CLOSING_MESSAGE =
   "Sem problemas, obrigado pelo retorno! Vou parar de te enviar mensagens por aqui. Se mudar de ideia, é só chamar. 🙂";
 
-// Handshake que a Meta faz uma unica vez ao registrar a URL do webhook no
-// painel do app - so devolve o challenge se o verify token bater.
-export async function GET(req: NextRequest) {
-  const mode = req.nextUrl.searchParams.get("hub.mode");
-  const token = req.nextUrl.searchParams.get("hub.verify_token");
-  const challenge = req.nextUrl.searchParams.get("hub.challenge");
-
-  if (!verifyWhatsappWebhookChallenge(mode, token) || !challenge) {
-    return new NextResponse("Forbidden", { status: 403 });
-  }
-
-  return new NextResponse(challenge, { status: 200 });
-}
-
-interface WhatsappWebhookPayload {
-  entry?: Array<{
-    changes?: Array<{
-      value?: {
-        contacts?: Array<{ wa_id: string; profile?: { name?: string } }>;
-        messages?: Array<{
-          from: string;
-          id: string;
-          type: string;
-          text?: { body: string };
-        }>;
-        statuses?: Array<{
-          id: string;
-          status: string;
-          errors?: Array<{ code: number; title: string; message?: string; error_data?: { details?: string } }>;
-        }>;
-      };
-    }>;
-  }>;
+// Evento da Evolution (v2). Os nomes chegam como "messages.upsert" ou
+// "MESSAGES_UPSERT" dependendo da config - normalizado em POST.
+interface EvolutionWebhookPayload {
+  event?: string;
+  data?: {
+    key?: { remoteJid?: string; remoteJidAlt?: string; senderPn?: string; fromMe?: boolean; id?: string };
+    pushName?: string;
+    message?: { conversation?: string; extendedTextMessage?: { text?: string } };
+    // messages.update
+    keyId?: string;
+    remoteJid?: string;
+    fromMe?: boolean;
+    status?: string;
+  };
 }
 
 // Lead que responde ao template da prospecção fria já tem linha em `leads`
@@ -59,11 +40,13 @@ async function findOrCreateConversation(
   isBotReply: boolean,
   profileName?: string
 ): Promise<{ id: string; lead_id: string; ai_enabled: boolean } | null> {
-  const { data: existing } = await supabase
+  const { data: matches } = await supabase
     .from("whatsapp_conversations")
     .select("id, lead_id, ai_enabled")
-    .eq("phone", from)
-    .maybeSingle();
+    .in("phone", brPhoneVariants(from))
+    .order("created_at", { ascending: true })
+    .limit(1);
+  const existing = matches?.[0];
 
   if (existing) {
     await supabase.from("whatsapp_messages").insert({
@@ -317,46 +300,40 @@ async function handleIncomingMessage(from: string, waMessageId: string, body: st
 }
 
 export async function POST(req: NextRequest) {
-  const rawBody = await req.text();
-  const signature = req.headers.get("x-hub-signature-256");
-
-  if (!(await verifyWhatsappSignature(signature, rawBody))) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  if (!verifyWhatsappWebhookToken(req.nextUrl.searchParams.get("token"))) {
+    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 
-  const payload: WhatsappWebhookPayload = JSON.parse(rawBody);
+  const payload: EvolutionWebhookPayload = await req.json().catch(() => ({}));
+  const event = (payload.event ?? "").toLowerCase().replace(/_/g, ".");
+  const data = payload.data;
 
-  // A Meta so espera 200 de volta pra parar de reentregar o evento -
-  // processa cada mensagem de texto recebida, ignorando outros tipos
-  // (imagem, audio, etc.) por enquanto, alem dos status de entrega/leitura
-  // das mensagens que a gente mandou (sent/delivered/read/failed).
-  for (const entry of payload.entry ?? []) {
-    for (const change of entry.changes ?? []) {
-      const contacts = change.value?.contacts ?? [];
-      for (const message of change.value?.messages ?? []) {
-        if (message.type === "text" && message.text?.body) {
-          const profileName = contacts.find((c) => c.wa_id === message.from)?.profile?.name;
-          try {
-            await handleIncomingMessage(message.from, message.id, message.text.body, profileName);
-          } catch (err) {
-            console.error("Erro processando mensagem do WhatsApp:", err);
-          }
-        }
+  // A Evolution so espera 200 de volta - processa mensagem de texto recebida,
+  // ignorando outros tipos (imagem, audio, etc.) por enquanto, alem dos
+  // status de entrega/leitura das mensagens que a gente mandou.
+  if (event === "messages.upsert" && data?.key) {
+    // fromMe = mensagem mandada pelo proprio numero (pela API ou pelo
+    // celular) - nao e resposta do lead.
+    const from = phoneFromJids(data.key.remoteJid, data.key.remoteJidAlt, data.key.senderPn);
+    const body = data.message?.conversation ?? data.message?.extendedTextMessage?.text;
+    if (!data.key.fromMe && from && data.key.id && body) {
+      try {
+        await handleIncomingMessage(from, data.key.id, body, data.pushName);
+      } catch (err) {
+        console.error("Erro processando mensagem do WhatsApp:", err);
       }
+    }
+  }
 
-      for (const statusUpdate of change.value?.statuses ?? []) {
-        try {
-          // A Meta so manda "errors" em status "failed" - guarda o motivo
-          // real (codigo + titulo) em vez de so a palavra "failed", senao
-          // uma falha em massa fica impossivel de diagnosticar depois.
-          const firstError = statusUpdate.errors?.[0];
-          const errorDetail = firstError
-            ? `[${firstError.code}] ${firstError.title}${firstError.error_data?.details ? ` - ${firstError.error_data.details}` : ""}`
-            : null;
-          await updateMessageDeliveryStatus(statusUpdate.id, statusUpdate.status, errorDetail);
-        } catch (err) {
-          console.error("Erro atualizando status de entrega do WhatsApp:", err);
-        }
+  if (event === "messages.update" && data?.keyId && data.fromMe !== false) {
+    const status = toDeliveryStatus(data.status);
+    if (status) {
+      try {
+        // WhatsApp Web nao informa o motivo da falha de entrega como a Meta
+        // fazia - fica so o status.
+        await updateMessageDeliveryStatus(data.keyId, status, null);
+      } catch (err) {
+        console.error("Erro atualizando status de entrega do WhatsApp:", err);
       }
     }
   }

@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { scrapeLeadsForQuery, analyzePendingSites, findPendingEmails, runPageSpeedForPending } from "@/lib/pipeline";
 import { sendPendingOutreach, sendFollowUps } from "@/lib/send-outreach";
 import { sendPendingWhatsappTemplates, sendPendingWhatsappFollowUps } from "@/lib/send-whatsapp-outreach";
+import { isEvolutionConfigured } from "@/lib/whatsapp";
 import { getPairsForDay, getProspectionConfig } from "@/config/prospection";
 import { COUNTRIES, COUNTRY_CODES, type Country } from "@/lib/countries";
 import { notifyTelegram } from "@/lib/telegram";
@@ -10,11 +11,6 @@ import { checkReplies } from "@/lib/reply-tracker";
 import { takeFocusNotices } from "@/lib/app-settings";
 
 export const maxDuration = 300;
-
-// Interruptor manual de emergencia - true enquanto o envio automatico de
-// WhatsApp estiver pausado (ver comentario mais abaixo, junto ao bloco que
-// usa esta flag).
-const WHATSAPP_AUTO_SEND_DISABLED = true;
 
 // Deixa margem de segurança pra sempre sobrar tempo de gravar o log final,
 // mesmo que uma etapa individual demore mais que o previsto.
@@ -226,13 +222,11 @@ export async function GET(req: NextRequest) {
       if (replies.error) errors.push(`replies: ${replies.error}`);
     }
 
-    // Envio automatico de WhatsApp pausado a pedido do usuario (conta Meta
-    // sem forma de pagamento ativa - continuar mandando queima cota e/ou
-    // gera cobranca sem entregar nada). Reativar removendo este if quando
-    // o pagamento estiver resolvido.
-    if (WHATSAPP_AUTO_SEND_DISABLED) {
-      errors.push("whatsapp-templates: desativado manualmente");
-      errors.push("whatsapp-followups: desativado manualmente");
+    // Envio automatico de WhatsApp so roda com a Evolution configurada. Pra
+    // pausar sem mexer em env, usar a pausa manual (app_settings).
+    if (!isEvolutionConfigured()) {
+      errors.push("whatsapp-templates: Evolution API não configurada");
+      errors.push("whatsapp-followups: Evolution API não configurada");
     } else {
       if (timeLeft() > 10_000) {
         try {
