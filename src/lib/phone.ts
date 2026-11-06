@@ -58,3 +58,32 @@ export function whatsappLink(phone: string | null, country: Country = "BR", pref
   const base = `https://wa.me/${config.ddi}${national}`;
   return prefilledText ? `${base}?text=${encodeURIComponent(prefilledText)}` : base;
 }
+
+// Busca por telefone no dashboard: se o termo tem cara de telefone (so
+// digitos e pontuacao, 4+ digitos), devolve um regex do Postgres que acha o
+// numero ignorando a formatacao salva ("(11) 98765-4321", "020 7946 0958").
+// Aceita o numero com ou sem DDI (+55, +1, +351, +44) e, no UK, com ou sem o
+// 0 de tronco. So digitos e [^0-9]*, nada que precise de escape no filtro.
+export function phoneSearchRegex(term: string, country: Country): string | null {
+  const trimmed = term.trim();
+  if (!/^[\d\s()+\-./]+$/.test(trimmed)) return null;
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length < 4) return null;
+
+  const { ddi, maxLocalDigits, stripTrunkZero } = COUNTRIES[country];
+  const candidates = new Set([digits]);
+  // Com "+" na frente e DDI com certeza; sem ele, so se for mais longo que um
+  // numero local (senao o DDD 55 do RS seria tratado como DDI).
+  const hasDdi =
+    digits.startsWith(ddi) &&
+    digits.length > ddi.length + 3 &&
+    (trimmed.startsWith("+") || digits.length > maxLocalDigits);
+  const local = hasDdi ? digits.slice(ddi.length) : digits;
+  candidates.add(local);
+  if (stripTrunkZero) {
+    if (local.startsWith("0")) candidates.add(local.slice(1));
+    else if (hasDdi) candidates.add(`0${local}`);
+  }
+  const alternatives = [...candidates].map((c) => c.split("").join("[^0-9]*"));
+  return alternatives.length === 1 ? alternatives[0] : `(${alternatives.join("|")})`;
+}

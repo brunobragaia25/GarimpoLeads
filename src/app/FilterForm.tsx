@@ -139,7 +139,7 @@ export function FilterForm({
 
         <div className="min-w-[200px] flex-[2]">
           <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
-            Buscar por nome
+            Buscar por nome ou telefone
           </label>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
@@ -147,7 +147,7 @@ export function FilterForm({
               type="text"
               value={searchValue}
               onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Nome do lead..."
+              placeholder="Nome ou telefone..."
               className="w-full rounded-lg border border-zinc-300 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
             />
           </div>

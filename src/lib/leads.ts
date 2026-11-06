@@ -3,6 +3,7 @@ import { supabase } from "./supabase";
 import type { SocialPlatform } from "./social-link";
 import { COUNTRY_CODES, isCountry, parseCountry, type Country } from "./countries";
 import { extractCity, extractNeighborhood, extractState } from "./template";
+import { phoneSearchRegex } from "./phone";
 
 export function toBrasiliaDateStr(iso: string | null): string | null {
   if (!iso) return null;
@@ -163,7 +164,13 @@ function applyLeadQuery(query: any, q: LeadQuery) {
   if (q.search) {
     // Escapa os curingas do ILIKE pra busca ser literal.
     const term = q.search.replace(/[\\%_]/g, (c) => `\\${c}`);
-    query = query.ilike("name", `%${term}%`);
+    // Termo com cara de telefone busca no nome OU no telefone. O termo so
+    // tem digitos e pontuacao de telefone, sem aspas/barra, entao pode ir
+    // direto entre aspas no or() do PostgREST.
+    const phoneRegex = phoneSearchRegex(q.search, q.country);
+    query = phoneRegex
+      ? query.or(`name.ilike."%${term}%",phone.match."${phoneRegex}"`)
+      : query.ilike("name", `%${term}%`);
   }
   if (q.priorityOnly) query = query.eq("is_priority", true);
   // starredOnly ("Só favoritos") e excludeStarred (fila normal, sem
