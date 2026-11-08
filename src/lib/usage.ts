@@ -10,7 +10,6 @@ function startOfMonthISO(): string {
 }
 
 export interface UsageStats {
-  hunterCallsThisMonth: number;
   emailsSentThisMonth: number;
   emailsSentToday: number;
   dailyLimit: number;
@@ -23,12 +22,6 @@ export interface UsageStats {
 export async function getUsageStats(): Promise<UsageStats> {
   const monthStart = startOfMonthISO();
   const todayStart = startOfTodayBrasiliaISO();
-
-  const { count: hunterCalls } = await supabase
-    .from("outreach")
-    .select("*", { count: "exact", head: true })
-    .ilike("notes", "%hunter_domain_search%")
-    .gte("created_at", monthStart);
 
   // Filtra por email presente: leads sem email marcados como "contacted"
   // manualmente (contato feito por WhatsApp) nao sao envio de email e nao
@@ -70,7 +63,6 @@ export async function getUsageStats(): Promise<UsageStats> {
   const aiUsage = await getAiUsageStats();
 
   return {
-    hunterCallsThisMonth: hunterCalls ?? 0,
     emailsSentThisMonth: (contactedThisMonth ?? 0) + (followUpsThisMonth ?? 0),
     emailsSentToday: (contactedToday ?? 0) + (followUpsToday ?? 0),
     dailyLimit: Number(process.env.SEND_DAILY_LIMIT) || 30,

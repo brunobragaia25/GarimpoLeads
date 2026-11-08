@@ -51,23 +51,6 @@ async function checkGoogleMaps(): Promise<HealthCheckResult> {
   }
 }
 
-async function checkHunter(): Promise<HealthCheckResult> {
-  try {
-    const res = await withTimeout(
-      fetch(`https://api.hunter.io/v2/account?api_key=${process.env.HUNTER_API_KEY}`)
-    );
-    const data = await res.json();
-    if (res.ok) {
-      const remaining = data?.data?.requests?.searches?.available ?? "?";
-      return { name: "Hunter.io", ok: true, message: `Chave válida (${remaining} buscas restantes no mês)` };
-    }
-    return { name: "Hunter.io", ok: false, message: data?.errors?.[0]?.details ?? "chave inválida" };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "erro desconhecido";
-    return { name: "Hunter.io", ok: false, message };
-  }
-}
-
 async function checkResend(): Promise<HealthCheckResult> {
   try {
     const res = await withTimeout(
@@ -123,7 +106,6 @@ export async function runHealthChecks(): Promise<HealthCheckResult[]> {
   const results = await Promise.all([
     checkSupabase(),
     checkGoogleMaps(),
-    checkHunter(),
     checkResend(),
     checkTelegram(),
     checkGestaoDevz(),

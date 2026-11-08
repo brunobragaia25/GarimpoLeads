@@ -44,7 +44,6 @@ check("SUPABASE_URL", {
 });
 check("SUPABASE_ANON_KEY");
 check("SUPABASE_SERVICE_ROLE_KEY");
-check("HUNTER_API_KEY");
 check("GOOGLE_MAPS_API_KEY", {
   validate: (v) => (!v.startsWith("AIza") ? "chaves do Google costumam começar com 'AIza'" : null),
 });

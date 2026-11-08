@@ -2,7 +2,6 @@ import { supabase } from "./supabase";
 import { searchLeads } from "./google-maps";
 import { deduplicateLeads, normalizePhone } from "./deduplication";
 import { analyzeSite } from "./site-analysis";
-import { findEmailForWebsite } from "./hunter";
 import { scrapeEmailFromWebsite } from "./email-scraper";
 import { fetchBlockedPhones } from "./blocklist";
 import { detectSocialPlatform } from "./social-link";
@@ -227,24 +226,15 @@ export async function analyzePendingSites(limit = 50) {
   return { analyzed: rows.length };
 }
 
-// Estrategia: tenta raspar o email direto do site primeiro (gratis, sem
-// limite de cota). So recorre ao Hunter.io (cota mensal escassa) quando a
-// raspagem nao acha nada. Leads em que a raspagem falhou e a cota do Hunter
-// ja tinha acabado ficam sem registro em `outreach` e sao retentados no
-// proximo dia; leads em que o Hunter foi consultado e nao achou nada ganham
-// registro com email null, pra nao queimar a cota de novo no mesmo lead.
-export async function findPendingEmails(hunterLimit = 2, scrapeLimit = 100, country?: Country) {
+// Raspa o email direto do site (gratis, sem cota). Lead em que a raspagem
+// nao acha nada fica sem registro em `outreach` e e retentado nos proximos
+// dias (falha pode ser temporaria: site fora do ar, timeout).
+export async function findPendingEmails(scrapeLimit = 100, country?: Country) {
   const processedIds = new Set(await fetchAllColumn("outreach", "lead_id"));
 
-  // Ordenado do MAIS NOVO pro mais antigo (era o contrario antes - bug
-  // corrigido): lead cuja raspagem falha e a cota do Hunter ja acabou no
-  // dia fica sem registro em `outreach` e e retentado pra sempre, entao em
-  // ordem crescente ele nunca sai da frente da fila e trava os leads novos
-  // atras dele indefinidamente (foi assim que ~2500 leads BR acumularam
-  // sem NUNCA ter o email buscado). Do mais novo pro mais antigo, um lead
-  // travado afunda pro fim da fila em vez de bloquear os que vem depois -
-  // ele ainda e retentado (so nao prioritario), e lead novo sempre recebe
-  // a tentativa de raspagem gratis no mesmo dia em que aparece.
+  // Do mais novo pro mais antigo: lead cuja raspagem sempre falha afunda pro
+  // fim da fila em vez de travar os leads novos atras dele (em ordem
+  // crescente ~2500 leads BR acumularam sem nunca ter o email buscado).
   // `country` e opcional - so usado em chamadas manuais pra atacar um pais
   // especifico sem disputar o orcamento diario com o backlog de outro.
   const leads = await fetchAllLeadsByWebsitePresence(true, country, "desc");
@@ -253,49 +243,20 @@ export async function findPendingEmails(hunterLimit = 2, scrapeLimit = 100, coun
     .filter((l) => !processedIds.has(l.id))
     .slice(0, scrapeLimit);
 
-  // Raspagem direta em paralelo (gratis, sem cota) - o fallback do Hunter
-  // continua sequencial pois a cota diaria e pequena e precisa contar
-  // certinho quantas chamadas ja foram usadas.
   const scrapeResults = await mapWithConcurrency(pending, 8, async (lead) => ({
     lead,
     scraped: await scrapeEmailFromWebsite(lead.website!),
   }));
 
-  const rows = [];
-  let hunterUsed = 0;
-
-  for (const { lead, scraped } of scrapeResults) {
-    if (scraped.email) {
-      rows.push({
-        lead_id: lead.id,
-        email: scraped.email,
-        email_confidence: scraped.confidence,
-        status: "pending",
-        notes: `Fonte: ${scraped.source}`,
-      });
-      continue;
-    }
-
-    if (hunterUsed < hunterLimit) {
-      hunterUsed++;
-      const hunterResult = await findEmailForWebsite(lead.website!);
-      // Grava a linha MESMO se o Hunter não achou nada (email null): o
-      // lead fica marcado como processado de vez, senão a cota escassa do
-      // Hunter seria queimada de novo no mesmo lead todo dia. Linhas com
-      // email null nunca entram no envio (sendPendingOutreach filtra).
-      rows.push({
-        lead_id: lead.id,
-        email: hunterResult.email,
-        email_confidence: hunterResult.confidence,
-        status: "pending",
-        notes: hunterResult.email
-          ? "Fonte: hunter_domain_search"
-          : "Fonte: hunter_domain_search (sem resultado)",
-      });
-    }
-    // Se a raspagem falhou e a cota do Hunter acabou, não grava nada:
-    // o lead continua sem registro e será retentado no próximo dia.
-  }
+  const rows = scrapeResults
+    .filter(({ scraped }) => scraped.email)
+    .map(({ lead, scraped }) => ({
+      lead_id: lead.id,
+      email: scraped.email,
+      email_confidence: scraped.confidence,
+      status: "pending",
+      notes: `Fonte: ${scraped.source}`,
+    }));
 
   if (rows.length > 0) {
     const { error: insertError } = await supabase.from("outreach").insert(rows);
@@ -304,8 +265,7 @@ export async function findPendingEmails(hunterLimit = 2, scrapeLimit = 100, coun
 
   return {
     processed: rows.length,
-    emails_found: rows.filter((r) => r.email).length,
-    hunter_calls_used: hunterUsed,
+    emails_found: rows.length,
   };
 }
 

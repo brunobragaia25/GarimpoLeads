@@ -10,7 +10,6 @@ function formatUsd(value: number): string {
 
 export const dynamic = "force-dynamic";
 
-const HUNTER_MONTHLY_QUOTA = 50;
 const SUPABASE_FREE_TIER_BYTES = 500 * 1024 * 1024; // 500MB
 
 function formatBytes(bytes: number): string {
@@ -161,14 +160,6 @@ export default async function UsagePage() {
 
         <div className="mt-4 space-y-4">
           <TrendChart trends={trends} />
-
-          <QuotaCard
-            title="Hunter.io (esse mês)"
-            used={stats.hunterCallsThisMonth}
-            total={HUNTER_MONTHLY_QUOTA}
-            suffix={`~${HUNTER_MONTHLY_QUOTA}`}
-            note="Só é usado quando a raspagem direta do site não encontra email (fallback)."
-          />
 
           <QuotaCard
             title="Emails enviados hoje"

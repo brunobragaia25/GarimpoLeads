@@ -25,9 +25,7 @@ const PAIRS_PER_DAY = 10;
 
 // Análise e busca de email agora rodam em paralelo (ver mapWithConcurrency
 // em pipeline.ts), então dá pra processar bem mais por dia dentro do mesmo
-// orçamento de tempo. Hunter.io só entra como fallback quando a raspagem
-// não acha nada; free tier tem 50 buscas/mês, então 2/dia dá margem.
-const HUNTER_FALLBACK_PER_DAY = 2;
+// orçamento de tempo.
 const SCRAPE_LIMIT_PER_DAY = 150;
 const ANALYZE_LIMIT_PER_DAY = 150;
 // Consultas ao PageSpeed por execucao (cada uma leva 10-40s).
@@ -147,7 +145,7 @@ export async function GET(req: NextRequest) {
 
     if (timeLeft() > 15_000) {
       try {
-        const emailResult = await findPendingEmails(HUNTER_FALLBACK_PER_DAY, SCRAPE_LIMIT_PER_DAY);
+        const emailResult = await findPendingEmails(SCRAPE_LIMIT_PER_DAY);
         emailsFound = emailResult.emails_found;
       } catch (err) {
         const message = err instanceof Error ? err.message : "erro desconhecido";
