@@ -1,6 +1,27 @@
 import { supabase } from "./supabase";
 
 const WHATSAPP_SENDING_PAUSED_KEY = "whatsapp_sending_paused";
+const EMAIL_SENDING_PAUSED_KEY = "email_sending_paused";
+
+// Pausa do envio automatico de e-mail (inicial e follow-up). Liga/desliga sem
+// deploy: upsert em app_settings (key=email_sending_paused, value=true|false).
+export async function isEmailSendingPaused(): Promise<boolean> {
+  const { data } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", EMAIL_SENDING_PAUSED_KEY)
+    .maybeSingle();
+  return data?.value === "true";
+}
+
+export async function setEmailSendingPaused(paused: boolean): Promise<void> {
+  await supabase
+    .from("app_settings")
+    .upsert(
+      { key: EMAIL_SENDING_PAUSED_KEY, value: String(paused), updated_at: new Date().toISOString() },
+      { onConflict: "key" }
+    );
+}
 
 export async function isWhatsappSendingPaused(): Promise<boolean> {
   const { data } = await supabase

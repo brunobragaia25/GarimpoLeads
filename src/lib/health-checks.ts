@@ -1,3 +1,4 @@
+import { isEmailSendingPaused } from "./app-settings";
 import { supabase } from "./supabase";
 import { getGestaoDevzFirestore } from "./firebase-admin";
 
@@ -52,6 +53,10 @@ async function checkGoogleMaps(): Promise<HealthCheckResult> {
 }
 
 async function checkResend(): Promise<HealthCheckResult> {
+  // Pausa de e-mail ligada: nao chama a API do Resend nem pra checar a chave.
+  if (await isEmailSendingPaused()) {
+    return { name: "Resend", ok: true, message: "Pausado (envio de e-mail desligado)" };
+  }
   try {
     const res = await withTimeout(
       fetch("https://api.resend.com/domains", {

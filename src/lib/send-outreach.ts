@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { isEmailSendingPaused } from "./app-settings";
 import {
   categoryTemplateKey,
   getTemplate,
@@ -87,6 +88,11 @@ export async function sendPendingOutreach(
   deadline = Infinity,
   country?: Country
 ) {
+  // Pausa manual: so barra o envio em lote (cron/fila). Envio de um lead
+  // especifico (botao) continua funcionando.
+  if (!leadId && (await isEmailSendingPaused())) {
+    return { sent: 0, failed: 0, blocked: 0, total: 0, paused: true };
+  }
   const resolveTemplate = await buildTemplateResolver();
   const dailyLimit = Number(process.env.SEND_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
 
@@ -203,6 +209,9 @@ export async function sendPendingOutreach(
 // Reenvia pra quem foi contatado há mais de `daysThreshold` dias e ainda não
 // recebeu follow-up. Compartilha a mesma cota diária dos envios iniciais.
 export async function sendFollowUps(daysThreshold = 5, limit = 20, deadline = Infinity, country?: Country) {
+  if (await isEmailSendingPaused()) {
+    return { sent: 0, failed: 0, blocked: 0, total: 0, paused: true };
+  }
   const dailyLimit = Number(process.env.SEND_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
   const alreadySentToday = await countSentToday();
   const remainingToday = Math.max(0, dailyLimit - alreadySentToday);
