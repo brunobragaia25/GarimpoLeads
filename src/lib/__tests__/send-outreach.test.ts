@@ -9,6 +9,8 @@ const state = vi.hoisted(() => ({
   countToday: 0,
 }));
 
+vi.mock("../app-settings", () => ({ isEmailSendingPaused: async () => false }));
+
 vi.mock("../supabase", () => {
   // Builder encadeavel e "await-avel", como o do supabase-js.
   function builder(table: string) {
